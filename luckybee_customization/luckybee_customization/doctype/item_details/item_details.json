@@ -1,0 +1,501 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-08-06 13:39:18.287695",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "itemtab_tab",
+  "item",
+  "amazon_section",
+  "asin_no",
+  "column_break_1zxqb",
+  "ean",
+  "flipkart_section",
+  "fsn_no",
+  "column_break_6vjgs",
+  "url",
+  "amazon_fields_tab",
+  "article",
+  "size",
+  "length_dimension",
+  "number_of_items",
+  "package_dimension",
+  "package_length",
+  "package_width",
+  "package_height",
+  "package_weight",
+  "package_quantity",
+  "item_length",
+  "item_breadth",
+  "item_height",
+  "item_weight",
+  "locale",
+  "title",
+  "sales_rank",
+  "sales_rank_reference",
+  "sales_rank_subcategory",
+  "sales_rank_current_price",
+  "sales_30_days_avg",
+  "sales_90_days_avg",
+  "sales_180_days_avg",
+  "new_30_days_avg",
+  "new_90_days_avg",
+  "new_180_days_avg",
+  "column_break_hss5d",
+  "new_lowest",
+  "new_highest",
+  "list_price_30_days_avg",
+  "list_price_90_days_avg",
+  "list_price_180_days_avg",
+  "list_price_lowest",
+  "listed_since",
+  "url_amazon",
+  "launchpad",
+  "product_codes_upc",
+  "product_codes_partnumber",
+  "parent_asin",
+  "variation_asins",
+  "freq_bought_together",
+  "manufacturer",
+  "product_group",
+  "model",
+  "variation_attribtutes",
+  "color",
+  "latest_rating_time",
+  "amazon_description__features_tab",
+  "desc_feature",
+  "desc_feature1",
+  "desc_feature2",
+  "desc_feature3",
+  "column_break_hvpjo",
+  "desc_feature4",
+  "desc_feature5",
+  "desc_feature6",
+  "flipkart_field_tab",
+  "title_flipkart",
+  "length_breadth",
+  "length_height",
+  "model_flipkart",
+  "section_break_ydef",
+  "item_groups",
+  "flipkart_description_and_features_tab",
+  "specification",
+  "specification_html_data"
+ ],
+ "fields": [
+  {
+   "fieldname": "itemtab_tab",
+   "fieldtype": "Tab Break",
+   "label": "Item"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "unique": 1
+  },
+  {
+   "fieldname": "amazon_section",
+   "fieldtype": "Section Break",
+   "label": "Amazon"
+  },
+  {
+   "fieldname": "asin_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Asin No"
+  },
+  {
+   "fieldname": "column_break_1zxqb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ean",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Ean"
+  },
+  {
+   "fieldname": "flipkart_section",
+   "fieldtype": "Section Break",
+   "label": "Flipkart"
+  },
+  {
+   "fieldname": "fsn_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "FSN No"
+  },
+  {
+   "fieldname": "column_break_6vjgs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Small Text",
+   "label": "URL"
+  },
+  {
+   "fieldname": "amazon_fields_tab",
+   "fieldtype": "Tab Break",
+   "label": "Amazon Fields"
+  },
+  {
+   "fieldname": "article",
+   "fieldtype": "Data",
+   "label": "Article"
+  },
+  {
+   "fieldname": "size",
+   "fieldtype": "Data",
+   "label": "Size"
+  },
+  {
+   "fieldname": "length_dimension",
+   "fieldtype": "Data",
+   "label": "Item: Dimension (cm\u00b3)"
+  },
+  {
+   "fieldname": "number_of_items",
+   "fieldtype": "Data",
+   "label": "Number of Items"
+  },
+  {
+   "fieldname": "package_dimension",
+   "fieldtype": "Data",
+   "label": "Package: Dimension (cm\u00b3)"
+  },
+  {
+   "fieldname": "package_length",
+   "fieldtype": "Data",
+   "label": "Package: Length (cm) "
+  },
+  {
+   "fieldname": "package_width",
+   "fieldtype": "Data",
+   "label": "Package: Width (cm)"
+  },
+  {
+   "fieldname": "package_height",
+   "fieldtype": "Data",
+   "label": "Package: Height (cm)"
+  },
+  {
+   "fieldname": "package_weight",
+   "fieldtype": "Data",
+   "label": "Package: Weight (g) "
+  },
+  {
+   "fieldname": "package_quantity",
+   "fieldtype": "Data",
+   "label": "Package: Quantity"
+  },
+  {
+   "fieldname": "item_length",
+   "fieldtype": "Data",
+   "label": "Item Length(cm)"
+  },
+  {
+   "fieldname": "item_breadth",
+   "fieldtype": "Data",
+   "label": "Item Breadth"
+  },
+  {
+   "fieldname": "item_height",
+   "fieldtype": "Data",
+   "label": "Item Height"
+  },
+  {
+   "fieldname": "item_weight",
+   "fieldtype": "Data",
+   "label": "Item Weight"
+  },
+  {
+   "fieldname": "locale",
+   "fieldtype": "Data",
+   "label": "Locale"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Small Text",
+   "label": "Title"
+  },
+  {
+   "fieldname": "sales_rank",
+   "fieldtype": "Data",
+   "label": "Sales Rank"
+  },
+  {
+   "fieldname": "sales_rank_reference",
+   "fieldtype": "Data",
+   "label": "Sales Rank: Reference"
+  },
+  {
+   "fieldname": "sales_rank_subcategory",
+   "fieldtype": "Data",
+   "label": "Sales Rank Subcategory"
+  },
+  {
+   "fieldname": "sales_rank_current_price",
+   "fieldtype": "Data",
+   "label": "Sales Rank Current Price"
+  },
+  {
+   "fieldname": "sales_30_days_avg",
+   "fieldtype": "Data",
+   "label": "Sales 30 days avg"
+  },
+  {
+   "fieldname": "sales_90_days_avg",
+   "fieldtype": "Data",
+   "label": "Sales 90 days avg"
+  },
+  {
+   "fieldname": "sales_180_days_avg",
+   "fieldtype": "Data",
+   "label": "Sales 180 days avg "
+  },
+  {
+   "fieldname": "new_30_days_avg",
+   "fieldtype": "Data",
+   "label": "New:30daysavg."
+  },
+  {
+   "fieldname": "new_90_days_avg",
+   "fieldtype": "Data",
+   "label": "New:90daysavg"
+  },
+  {
+   "fieldname": "new_180_days_avg",
+   "fieldtype": "Data",
+   "label": "New:180daysavg."
+  },
+  {
+   "fieldname": "column_break_hss5d",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "new_lowest",
+   "fieldtype": "Data",
+   "label": "New Lowest"
+  },
+  {
+   "fieldname": "new_highest",
+   "fieldtype": "Data",
+   "label": "New Highest"
+  },
+  {
+   "fieldname": "list_price_30_days_avg",
+   "fieldtype": "Data",
+   "label": "List Price 30 days avg"
+  },
+  {
+   "fieldname": "list_price_90_days_avg",
+   "fieldtype": "Data",
+   "label": "List Price 90 days avg"
+  },
+  {
+   "fieldname": "list_price_180_days_avg",
+   "fieldtype": "Data",
+   "label": "List Price 180 days avg"
+  },
+  {
+   "fieldname": "list_price_lowest",
+   "fieldtype": "Data",
+   "label": "List Price Lowest"
+  },
+  {
+   "fieldname": "listed_since",
+   "fieldtype": "Data",
+   "label": "Listed Since"
+  },
+  {
+   "fieldname": "url_amazon",
+   "fieldtype": "Data",
+   "label": "URL Amazon"
+  },
+  {
+   "fieldname": "launchpad",
+   "fieldtype": "Data",
+   "label": "Launchpad"
+  },
+  {
+   "fieldname": "product_codes_upc",
+   "fieldtype": "Data",
+   "label": "Product Codes UPC"
+  },
+  {
+   "fieldname": "product_codes_partnumber",
+   "fieldtype": "Data",
+   "label": "Product Codes PartNumber"
+  },
+  {
+   "fieldname": "parent_asin",
+   "fieldtype": "Data",
+   "label": "Parent Asin"
+  },
+  {
+   "fieldname": "variation_asins",
+   "fieldtype": "Small Text",
+   "label": "Variation Asins"
+  },
+  {
+   "fieldname": "freq_bought_together",
+   "fieldtype": "Data",
+   "label": "Freq Bought Together"
+  },
+  {
+   "fieldname": "manufacturer",
+   "fieldtype": "Data",
+   "label": "Manufacturer"
+  },
+  {
+   "fieldname": "product_group",
+   "fieldtype": "Data",
+   "label": "Product Group"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "variation_attribtutes",
+   "fieldtype": "Data",
+   "label": "Variation Attribtutes"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Data",
+   "label": "Color"
+  },
+  {
+   "fieldname": "latest_rating_time",
+   "fieldtype": "Data",
+   "label": "Latest Rating Time"
+  },
+  {
+   "fieldname": "amazon_description__features_tab",
+   "fieldtype": "Tab Break",
+   "label": "Amazon Description &  Features"
+  },
+  {
+   "fieldname": "desc_feature",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature"
+  },
+  {
+   "fieldname": "desc_feature1",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature1"
+  },
+  {
+   "fieldname": "desc_feature2",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature2"
+  },
+  {
+   "fieldname": "desc_feature3",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature3"
+  },
+  {
+   "fieldname": "column_break_hvpjo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "desc_feature4",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature4"
+  },
+  {
+   "fieldname": "desc_feature5",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature5"
+  },
+  {
+   "fieldname": "desc_feature6",
+   "fieldtype": "Text Editor",
+   "label": "Desc Feature6"
+  },
+  {
+   "fieldname": "flipkart_field_tab",
+   "fieldtype": "Tab Break",
+   "label": "Flipkart Field"
+  },
+  {
+   "fieldname": "title_flipkart",
+   "fieldtype": "Data",
+   "label": "Title"
+  },
+  {
+   "fieldname": "length_breadth",
+   "fieldtype": "Data",
+   "label": "Length Breadth"
+  },
+  {
+   "fieldname": "length_height",
+   "fieldtype": "Data",
+   "label": "Length Height"
+  },
+  {
+   "fieldname": "model_flipkart",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "flipkart_description_and_features_tab",
+   "fieldtype": "Tab Break",
+   "label": "Flipkart Description and Features"
+  },
+  {
+   "fieldname": "specification",
+   "fieldtype": "Small Text",
+   "label": "Specification"
+  },
+  {
+   "fieldname": "specification_html_data",
+   "fieldtype": "HTML",
+   "label": "Specification Html Data"
+  },
+  {
+   "fieldname": "section_break_ydef",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item_groups",
+   "fieldtype": "Table MultiSelect",
+   "label": "Item Groups",
+   "options": "Item group ms"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-08-06 17:07:03.771588",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Item Details",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

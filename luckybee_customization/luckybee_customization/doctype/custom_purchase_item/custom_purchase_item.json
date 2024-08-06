@@ -1,0 +1,116 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-08-06 11:58:20.509485",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "description_of_good_and_services",
+  "hsnsac",
+  "quantity",
+  "rate",
+  "per",
+  "disc_",
+  "disc",
+  "amount",
+  "gst",
+  "lrp",
+  "mrp",
+  "brand",
+  "group",
+  "category",
+  "sub_category"
+ ],
+ "fields": [
+  {
+   "fieldname": "description_of_good_and_services",
+   "fieldtype": "Data",
+   "label": "Description of Good and Services"
+  },
+  {
+   "fieldname": "hsnsac",
+   "fieldtype": "Data",
+   "label": "HSN/SAC"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Data",
+   "label": "Quantity"
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Data",
+   "label": "Rate"
+  },
+  {
+   "fieldname": "per",
+   "fieldtype": "Data",
+   "label": "per"
+  },
+  {
+   "fieldname": "disc_",
+   "fieldtype": "Data",
+   "label": "Disc. %"
+  },
+  {
+   "fieldname": "disc",
+   "fieldtype": "Data",
+   "label": "Disc"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Float",
+   "label": "Amount"
+  },
+  {
+   "fieldname": "gst",
+   "fieldtype": "Link",
+   "label": "GST%",
+   "options": "Item Tax Template"
+  },
+  {
+   "fieldname": "lrp",
+   "fieldtype": "Currency",
+   "label": "LRP"
+  },
+  {
+   "fieldname": "mrp",
+   "fieldtype": "Currency",
+   "label": "MRP"
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Data",
+   "label": "Brand"
+  },
+  {
+   "fieldname": "group",
+   "fieldtype": "Data",
+   "label": "Group"
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Data",
+   "label": "Category"
+  },
+  {
+   "fieldname": "sub_category",
+   "fieldtype": "Data",
+   "label": " Sub Category"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-08-06 11:58:20.509485",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Custom Purchase Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
