@@ -232,3 +232,17 @@ doc_events = {"Item": {
 		"on_update": "luckybee_customization.overrides.item_utils.check_image"
         }
     }
+
+
+
+
+
+fixtures = [
+     {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "module", "in", ["luckybee_customization"]
+            ]
+        ]
+    }]
