@@ -48,9 +48,9 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			# --------------------comment for now-----------------
 
 
-			# item.opening_stock=rate
-			# item.standard_rate=rate
-			# item.size=qty
+			item.opening_stock=rate
+			item.standard_rate=rate
+			item.size=qty
 			item.save()
 			item.custom_barcode = item.item_code
 			barcode_row = item.append("barcodes", {})
@@ -147,23 +147,23 @@ def create_item_price(item, lrp=None, discounted_price=None):
 		item_price.save()
 
 	else:
-		pass
 		# -----------------comment for now---------------------
-		# ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"})
-		# if str(ip.price_list_rate) != str(lrp):
-		# 	ip.price_list_rate = lrp
-		# 	ip.save()
-		# 	for ipd in item.custom_item_price_details:
-		# 		if ip.name == ipd.item_price:
-		# 			ipd.rate = lrp
-		# 	# item.save()
+		ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"})
+		frappe.log_error("IP",ip)
+		if str(ip.price_list_rate) != str(lrp):
+			ip.price_list_rate = lrp
+			ip.save()
+			for ipd in item.custom_item_price_details:
+				if ip.name == ipd.item_price:
+					ipd.rate = lrp
+			# item.save()
 
-		# ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Buying"})
-		# if str(ip.price_list_rate) != str(discounted_price):
-		# 	ip.price_list_rate = discounted_price
-		# 	ip.save()
-		# 	for ipd in item.custom_item_price_details:
-		# 		if ip.name == ipd.item_price:
-		# 			ipd.rate = discounted_price
-		# item.save()
+		ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Buying"})
+		if str(ip.price_list_rate) != str(discounted_price):
+			ip.price_list_rate = discounted_price
+			ip.save()
+			for ipd in item.custom_item_price_details:
+				if ip.name == ipd.item_price:
+					ipd.rate = discounted_price
+		item.save()
 		# -----------------comment for now---------------------
