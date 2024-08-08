@@ -88,7 +88,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 		# if disc_perc:
 			# dict_itm.update({"item_code": frappe.db.get_value("Item", {"item_name": description}, 'item_code'),
 			# 				"qty": qty, "item_name": description, "uom": "Nos", "rate": discounted_price, "amount": int(qty)*float(discounted_price)})
-		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating','last_purchase_rate'])
+		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','last_purchase_rate'])
 		dict_itm.update({
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,

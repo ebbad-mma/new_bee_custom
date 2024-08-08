@@ -39,7 +39,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 			item.custom_sub_category = sub_category
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
-			item.ean = custom_ean
+			item.custom_ean = custom_ean
 			# item.custon_fsn_no = custom_fsn
 
 			
@@ -57,7 +57,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 			# item.opening_stock=rate
 			# item.standard_rate=rate
 			# item.size=qty
-			item.save()
+			item.insert(ignore_permissions=True)
 			item.custom_barcode = item.item_code
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
@@ -90,7 +90,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 					barcode_row.barcode = item.item_code
 			item.save()
 			time.sleep(5)				
-		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating','new_current','reviews_count','last_purchase_rate','last_price','list_price_highest'])
+		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest'])
 		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
 		last_price_safe = safe_int(last_price)
 		list_price_highest_safe = safe_int(list_price_highest)

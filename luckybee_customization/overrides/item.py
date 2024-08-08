@@ -57,10 +57,10 @@ def update_item(doc, event):
 					if len(products[i]['csv']) > 0:
 						if len(products[i]['csv']) >= 17:
 							if products[i]['csv'][17]:
-								item.reviews_count = products[i]['csv'][17][-1]
+								item.custom_reviews_count = products[i]['csv'][17][-1]
 						if len(products[i]['csv']) >= 16:
 							if products[i]['csv'][16]:
-								item.reviews_rating = str(products[i]['csv'][16][-1]/10)
+								item.custom_reviews_rating = str(products[i]['csv'][16][-1]/10)
 					item_detail.parent_asin = products[i]["parentAsin"]
 					category_tree = []
 					category_tree_dict = {}
@@ -70,12 +70,12 @@ def update_item(doc, event):
 
 					if category_tree:
 						item.category_sub = category_tree[-1]
-						item.categories_tree = ", ".join(category_tree)
+						item.custom_categories_tree = ", ".join(category_tree)
 					if category_tree_dict:
-						item.category_root = category_tree_dict.get(products[0].get('rootCategory'))
+						item.custom_category_root = category_tree_dict.get(products[0].get('rootCategory'))
 					
 					# item.ean =  re.findall('[0-9]+', json.dumps(products[i]['eanList'][0]))[0] if products[i]['eanList'] is not None else ''
-					item.ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
+					item.custom_ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
 
 					item_detail.product_codes_upc = json.dumps(products[i]['upcList'])
 					item_detail.launchpad = products[i]['launchpad']  # currently a data field, should be checkbox
@@ -133,8 +133,8 @@ def update_item(doc, event):
 
 						if current:
 							item_detail.sales_rank_current_price = current.get("SALES")
-							item.last_price = current.get("LISTPRICE")
-							item.new_current = current.get("NEW")
+							item.custom_last_price = current.get("LISTPRICE")
+							item.custom_new_current = current.get("NEW")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -161,8 +161,8 @@ def update_item(doc, event):
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
 								doc.list_price_highest = highest_listprice[1]
-					if doc.ean:
-						item_detail.ean=doc.ean
+					if doc.custom_ean:
+						item_detail.ean=doc.custom_ean
 					item_detail.item=doc.name
 					item_detail.save()
 					item.save()
@@ -175,11 +175,11 @@ def update_item(doc, event):
 		EAN = [row.ean for row in item.items if row.ean]
 		if EAN:
 			if not frappe.db.exists('Item Details',{'asin_no':doc.custom_asin_no}):
-				if not frappe.db.exists('Item Details',{'ean':doc.ean}):
+				if not frappe.db.exists('Item Details',{'ean':doc.custom_ean}):
 					item_det=frappe.new_doc('Item Details')
-					item_det.ean=doc.ean
+					item_det.ean=doc.custom_ean
 					item_det.save()
-			if frappe.db.exists('Item Details',{'ean':doc.ean}):
+			if frappe.db.exists('Item Details',{'ean':doc.custom_ean}):
 					item_detail=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False)
@@ -227,10 +227,10 @@ def update_item(doc, event):
 						if len(products[i]['csv']) > 0:
 							if len(products[i]['csv']) >= 17:
 								if products[i]['csv'][17]:
-									item.reviews_count = products[i]['csv'][17][-1]
+									item.custom_reviews_count = products[i]['csv'][17][-1]
 							if len(products[i]['csv']) >= 16:
 								if products[i]['csv'][16]:
-									item.reviews_rating = str(products[i]['csv'][16][-1]/10)
+									item.custom_reviews_rating = str(products[i]['csv'][16][-1]/10)
 						item_detail.parent_asin= products[i]["parentAsin"]
 						category_tree = []
 						category_tree_dict = {}
@@ -240,12 +240,12 @@ def update_item(doc, event):
 
 						if category_tree:
 							item.category_sub = category_tree[-1]
-							item.categories_tree = ", ".join(category_tree)
+							item.custom_categories_tree = ", ".join(category_tree)
 						if category_tree_dict:
-							item.category_root = category_tree_dict.get(products[0].get('rootCategory'))
+							item.custom_category_root = category_tree_dict.get(products[0].get('rootCategory'))
 						
 						# item.ean =  re.findall('[0-9]+', json.dumps(products[i]['eanList'][0]))[0] if products[i]['eanList'] is not None else ''
-						item.ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
+						item.custom_ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
 
 						item_detail.product_codes_upc  = json.dumps(products[i]['upcList'])
 						item_detail.launchpad= products[i]['launchpad']  # currently a data field, should be checkbox
@@ -303,8 +303,8 @@ def update_item(doc, event):
 
 							if current:
 								item_detail.sales_rank_current_price = current.get("SALES")
-								item.last_price = current.get("LISTPRICE")
-								item.new_current = current.get("NEW")
+								item.custom_last_price = current.get("LISTPRICE")
+								item.custom_new_current = current.get("NEW")
 							if avg30:
 								item_detail.sales_30_days_avg = avg30.get("SALES")
 								item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -396,10 +396,10 @@ def sync_keepa_item(doc, event):
 					if len(products[i]['csv']) > 0:
 						if len(products[i]['csv']) >= 17:
 							if products[i]['csv'][17]:
-								doc.reviews_count = products[i]['csv'][17][-1]
+								doc.custom_reviews_count = products[i]['csv'][17][-1]
 						if len(products[i]['csv']) >= 16:
 							if products[i]['csv'][16]:
-								doc.reviews_rating = str(products[i]['csv'][16][-1]/10)
+								doc.custom_reviews_rating = str(products[i]['csv'][16][-1]/10)
 					item_detail.parent_asin = products[i]["parentAsin"]
 					category_tree = []
 					category_tree_dict = {}
@@ -409,12 +409,12 @@ def sync_keepa_item(doc, event):
 
 					if category_tree:
 						doc.category_sub = category_tree[-1]
-						doc.categories_tree = ", ".join(category_tree)
+						doc.custom_categories_tree = ", ".join(category_tree)
 					if category_tree_dict:
-						doc.category_root = category_tree_dict.get(products[0].get('rootCategory'))
+						doc.custom_category_root = category_tree_dict.get(products[0].get('rootCategory'))
 					
 					# doc.ean =  re.findall('[0-9]+', json.dumps(products[i]['eanList'][0]))[0] if products[i]['eanList'] is not None else ''
-					doc.ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
+					doc.custom_ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
 
 					item_detail.product_codes_upc = json.dumps(products[i]['upcList'])
 					item_detail.launchpad = products[i]['launchpad']  # currently a data field, should be checkbox
@@ -474,8 +474,8 @@ def sync_keepa_item(doc, event):
 						highest = stats_parsed.get("max")
 						if current:
 							item_detail.sales_rank_current_price = current.get("SALES")
-							doc.last_price = current.get("LISTPRICE")
-							doc.new_current = current.get("NEW")
+							doc.custom_last_price = current.get("LISTPRICE")
+							doc.custom_new_current = current.get("NEW")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -502,26 +502,26 @@ def sync_keepa_item(doc, event):
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
 								doc.list_price_highest = highest_listprice[1]
-				if doc.ean:
+				if doc.custom_ean:
 					item_detail.ean=doc.ean
 				item_detail.save()
 				doc.custom_item_detail=item_detail.name
 				frappe.msgprint(_("Item(s) has been synced with keepa"))
 
-	elif doc.ean:
-		EAN = [doc.ean]
+	elif doc.custom_ean:
+		EAN = [doc.custom_ean]
 		if EAN:
 			if not doc.custom_asin_no:
-				if not frappe.db.exists('Item Details',{'ean':doc.ean}):
+				if not frappe.db.exists('Item Details',{'ean':doc.custom_ean}):
 					item_det=frappe.new_doc('Item Details')
-					item_det.ean=doc.ean
+					item_det.ean=doc.custom_ean
 					item_det.save()
-			if frappe.db.exists('Item Details',{'ean':doc.ean}):
-				item_detail=frappe.get_doc('Item Details',{'ean':doc.ean})
+			if frappe.db.exists('Item Details',{'ean':doc.custom_ean}):
+				item_detail=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1,product_code_is_asin=False)
 			except Exception as e:
-				frappe.throw(_(f"Invalid EAN: {doc.ean}"))
+				frappe.throw(_(f"Invalid EAN: {doc.custom_ean}"))
 			else:
 				for i in range(len(EAN)):
 					if not frappe.db.exists('Brand',products[i]['brand']):
@@ -561,10 +561,10 @@ def sync_keepa_item(doc, event):
 					if len(products[i]['csv']) > 0:
 						if len(products[i]['csv']) >= 17:
 							if products[i]['csv'][17]:
-								doc.reviews_count = products[i]['csv'][17][-1]
+								doc.custom_reviews_count = products[i]['csv'][17][-1]
 						if len(products[i]['csv']) >= 16:
 							if products[i]['csv'][16]:
-								doc.reviews_rating = str(products[i]['csv'][16][-1]/10)
+								doc.custom_reviews_rating = str(products[i]['csv'][16][-1]/10)
 					item_detail.parent_asin = products[i]["parentAsin"]					
 					category_tree = []
 					category_tree_dict = {}
@@ -574,12 +574,12 @@ def sync_keepa_item(doc, event):
 
 					if category_tree:
 						doc.category_sub = category_tree[-1]
-						doc.categories_tree = ", ".join(category_tree)
+						doc.custom_categories_tree = ", ".join(category_tree)
 					if category_tree_dict:
-						doc.category_root = category_tree_dict.get(products[0].get('rootCategory'))
+						doc.custom_category_root = category_tree_dict.get(products[0].get('rootCategory'))
 					
 					# doc.ean =  re.findall('[0-9]+', json.dumps(products[i]['eanList'][0]))[0] if products[i]['eanList'] is not None else ''
-					doc.ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
+					doc.custom_ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
 
 					item_detail.product_codes_upc = json.dumps(products[i]['upcList'])
 					item_detail.launchpad = products[i]['launchpad']  # currently a data field, should be checkbox
@@ -639,8 +639,8 @@ def sync_keepa_item(doc, event):
 						highest = stats_parsed.get("max")
 						if current:
 							item_detail.sales_rank_current_price= current.get("SALES")
-							doc.last_price = current.get("LISTPRICE")
-							doc.new_current = current.get("NEW")
+							doc.custom_last_price = current.get("LISTPRICE")
+							doc.custom_new_current = current.get("NEW")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")

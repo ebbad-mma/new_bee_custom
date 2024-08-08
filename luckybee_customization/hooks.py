@@ -227,11 +227,11 @@ doctype_js = {"Purchase Invoice" : "public/js/purchase_invoice.js",}
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
-doc_events = {"Item": {
-		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
-		"on_update": "luckybee_customization.overrides.item_utils.check_image"
-        }
-    }
+# doc_events = {"Item": {
+# 		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
+# 		"on_update": "luckybee_customization.overrides.item_utils.check_image"
+#         }
+#     }
 
 
 
@@ -245,4 +245,13 @@ fixtures = [
                 "module", "in", ["luckybee_customization"]
             ]
         ]
-    }]
+    },
+     {
+        "dt": "Property Setter",
+        "filters": [
+            [
+                "module", "in", ["luckybee_customization"]
+            ]
+        ]
+    },
+    ]
