@@ -9,7 +9,7 @@ def safe_int(value, default=0):
 		return default
 
 @frappe.whitelist()
-def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean):
+def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc):
 	doc = json.loads(doc)
 
 	dict_itm = {}
@@ -43,16 +43,16 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 			# item.custon_fsn_no = custom_fsn
 
 			
-			# # gst = ""
+			gst = ""
 			# if disc_perc:
-			# 	if disc == "15.25":
-			# 		gst = "GST 18% - SR"
-			# 	elif disc == "10.71":
-			# 		gst = "GST 12% - SR"
-			# 	elif disc == "4.71":
-			# 		gst = "GST 5% - SR"
-			# 	row = item.append("taxes", {})
-			# 	row.item_tax_template = gst
+			if disc == "15.25":
+				gst = "GST 18% - SR"
+			elif disc == "10.71":
+				gst = "GST 12% - SR"
+			elif disc == "4.71":
+				gst = "GST 5% - SR"
+			row = item.append("taxes", {})
+			row.item_tax_template = gst
 
 			# item.opening_stock=rate
 			# item.standard_rate=rate
@@ -95,6 +95,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 		last_price_safe = safe_int(last_price)
 		list_price_highest_safe = safe_int(list_price_highest)
 		mrp = last_price_safe if last_price_safe > 0 else list_price_highest_safe
+		if reviews_count is not None:
+			reviews_count=int(reviews_count)
 		dict_itm.update({
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,
@@ -105,7 +107,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 							"custom_asin":custom_asin,
 							"rate":rate,
 							"custom_box_number":custom_box_number,
-							"custom_reviews_count":int(reviews_count),
+							"custom_reviews_count":reviews_count,
 							"last_purchase_rate":last_purchase_rate,
 							"mrp":mrp
 						})

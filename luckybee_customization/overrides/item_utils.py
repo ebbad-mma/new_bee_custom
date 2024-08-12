@@ -12,8 +12,8 @@ def check_image(doc,method=None):
         item=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
         item.item=doc.name
         item.save()
-    elif doc.ean:
-        item=frappe.get_doc('Item Details',{'ean':doc.ean})
+    elif doc.custom_ean:
+        item=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
         item.item=doc.name
         item.save()
     elif doc.custom_fsn_no:

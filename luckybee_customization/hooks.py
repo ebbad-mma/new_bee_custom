@@ -28,7 +28,10 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Purchase Invoice" : "public/js/purchase_invoice.js",}
+doctype_js = {
+    "Purchase Invoice" : "public/js/purchase_invoice.js",
+    "Item" : "public/js/item.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -227,11 +230,11 @@ doctype_js = {"Purchase Invoice" : "public/js/purchase_invoice.js",}
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
-# doc_events = {"Item": {
-# 		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
-# 		"on_update": "luckybee_customization.overrides.item_utils.check_image"
-#         }
-#     }
+doc_events = {"Item": {
+		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
+		"on_update": "luckybee_customization.overrides.item_utils.check_image"
+        }
+    }
 
 
 

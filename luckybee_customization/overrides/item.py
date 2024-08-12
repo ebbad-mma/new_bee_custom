@@ -503,7 +503,7 @@ def sync_keepa_item(doc, event):
 							if highest_listprice and len(highest_listprice)==2:
 								doc.list_price_highest = highest_listprice[1]
 				if doc.custom_ean:
-					item_detail.ean=doc.ean
+					item_detail.ean=doc.custom_ean
 				item_detail.save()
 				doc.custom_item_detail=item_detail.name
 				frappe.msgprint(_("Item(s) has been synced with keepa"))
@@ -731,6 +731,7 @@ def sync_keepa_item(doc, event):
 		item_detail.fsn_no = doc.custom_fsn_no
 		item_detail.specification = str(data['general'])
 		item_detail.save()
+		doc.custom_item_detail=item_detail.name
 
 			# doc.save()
 			# doc.reload()

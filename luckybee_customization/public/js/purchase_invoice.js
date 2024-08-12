@@ -37,7 +37,9 @@ frappe.ui.form.on('Purchase Invoice', {
                                 'sub_category': obj.sub_category != null ? obj.sub_category : "",
                                 'custom_asin': obj.custom_asin != null ? obj.custom_asin : "",
                                 'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
-                                "custom_ean": obj.custom_ean != null ? obj.custom_ean : ""
+                                "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
+                                "disc": obj.disc != null ? flt(obj.disc) : 0
+
                             },
                             freeze: true,
                             freeze_message: "loading items...",

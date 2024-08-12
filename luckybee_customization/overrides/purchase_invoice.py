@@ -10,18 +10,27 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 
 	dict_itm = {}
 	if description :
-		# item_nt_exist=frappe.db.exists("Item", {"name":custom_purchase_item})
-		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
-		# if disc_perc: 
-		rate = float(rate)
-		disc_perc = float(disc_perc)
-		discounted_price = rate - (rate * (disc_perc / 100))
+
+		#create UOM
+		if not frappe.db.exists('UOM',{'uom_name': per}):
+			uom=frappe.new_doc('UOM')
+			uom.uom_name=per
+			uom.enabled=1
+			uom.insert()
+		#calculate buying price
+		if disc_perc: 
+			rate = float(rate)
+			disc_perc = float(disc_perc)
+			discounted_price = rate - (rate * (disc_perc / 100))
+
+			
+		item_code_exist = frappe.db.exists('Item', {'item_name':description}, 'item_code')
 
 		if not item_code_exist:
 			item = frappe.new_doc("Item")
 			# item.naming_series = 'L.#####'
 			# item.item_code=custom_purchase_item
-			item.stoc_uom = per
+			item.stock_uom = per
 			item.gst_hsn_code = ''
 			item.item_name = description
 			item.item_group = 'All Groups'
@@ -31,20 +40,21 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			item.custom_group = group
 
 			item.custom_category = category
-			item.custom_sub_category = sub_category
+			item.custom_category_sub = sub_category
 
 			
-			# gst = ""
+			gst = ""
+			frappe.log_error(f"{disc}")
 			# if disc_perc:
 			# --------------------comment for now-----------------
-			# if disc == "15.25":
-			# 	gst = "GST 18% - SR"
-			# elif disc == "10.71":
-			# 	gst = "GST 12% - SR"
-			# elif disc == "4.71":
-			# 	gst = "GST 5% - SR"
-			# row = item.append("taxes", {})
-			# row.item_tax_template = gst
+			if disc == "15.25":
+				gst = "GST 18% - SR"
+			elif disc == "10.71":
+				gst = "GST 12% - SR"
+			elif disc == "4.71":
+				gst = "GST 5% - SR"
+			row = item.append("taxes", {})
+			row.item_tax_template = gst
 			# --------------------comment for now-----------------
 
 
@@ -123,8 +133,15 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 		# 					"qty": qty, "item_name": description, "uom": "Nos", "rate": rate, "amount": int(qty)*int(rate)})
 		return dict_itm
 
+
+
+
+
+
+# ---------------------------create item price---------------------------------
 def create_item_price(item, lrp=None, discounted_price=None):
 	if not frappe.db.exists("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"}):
+		frappe.log_error("not exists ss")
 		item_price = frappe.new_doc("Item Price")
 		item_price.item_code = item.item_code
 		item_price.price_list = "Standard Selling"
@@ -136,6 +153,7 @@ def create_item_price(item, lrp=None, discounted_price=None):
 		item_price.save()
 
 	if not frappe.db.exists("Item Price", {"item_code": item.item_code, "price_list": "Standard Buying"}):
+		frappe.log_error("not exists sb")
 		item_price = frappe.new_doc("Item Price")
 		item_price.item_code = item.item_code
 		item_price.price_list = "Standard Buying"
@@ -166,4 +184,5 @@ def create_item_price(item, lrp=None, discounted_price=None):
 				if ip.name == ipd.item_price:
 					ipd.rate = discounted_price
 		item.save()
+		frappe.log_error("iii",item.name)
 		# -----------------comment for now---------------------
