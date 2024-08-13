@@ -284,13 +284,14 @@ frappe.ui.form.on('Purchase Invoice Item', {
                 frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap','')
                 frappe.throw("please first apply percentage for item")}
             else{
-            let lrpValue = d.custom_percentage + d.rate;
+            let custom_percentage=(d.custom_percentage/100)*d.rate
+            let lrpValue =custom_percentage + d.rate;
             if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
             let int_lrp = Math.floor(lrpValue);
-            console.log("intlrp",int_lrp)
             if (int_lrp % 10 === 9) {
                 lrpValue = int_lrp;
             } else {
+                console.log("int_lrp",int_lrp)
                 let stringValue = int_lrp.toString();
                 let modifiedString = stringValue.slice(0, -1) + '9';
                 lrpValue = parseFloat(modifiedString);
@@ -301,10 +302,14 @@ frappe.ui.form.on('Purchase Invoice Item', {
             let discount_on_mrp = d.custom_mrp - lrpValue;
             let dis = (discount_on_mrp * 100) / d.custom_mrp;
             let custom_discount = Math.round(dis / 10) * 10;
+
+            // #calculate margin
+            let discount_on_margin = lrpValue - d.rate;
+            let margin = (discount_on_margin / d.rate * 100);
             
             frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
             frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
-            frappe.model.set_value(cdt, cdn, 'custom_margin', d.custom_percentage);
+            frappe.model.set_value(cdt, cdn, 'custom_margin',margin);
         }} else if (d.custom_ppmumrpdap === 'MRPD') {
             if(!d.custom_percentage){
                 frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap','')
@@ -317,10 +322,12 @@ frappe.ui.form.on('Purchase Invoice Item', {
             let int_lrp = Math.floor(lrpValue);
             if (int_lrp % 10 === 9) {
                 lrpValue = int_lrp;
+                console.log("intr",lrpValue)
             } else {
                 let stringValue = int_lrp.toString();
                 let modifiedString = stringValue.slice(0, -1) + '9';
                 lrpValue = parseFloat(modifiedString);
+                console.log("llll",lrpValue)
             }
         }
             let discount_on_margin = lrpValue - d.rate;
