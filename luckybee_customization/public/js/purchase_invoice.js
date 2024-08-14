@@ -280,67 +280,96 @@ frappe.ui.form.on('Purchase Invoice Item', {
         let d = locals[cdt][cdn];
         
         if (d.custom_ppmumrpdap === 'PPMU') {
-            if(!d.custom_percentage){
-                frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap','')
-                frappe.throw("please first apply percentage for item")}
-            else{
-            let custom_percentage=(d.custom_percentage/100)*d.rate
-            let lrpValue =custom_percentage + d.rate;
-            if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
-            let int_lrp = Math.floor(lrpValue);
-            if (int_lrp % 10 === 9) {
-                lrpValue = int_lrp;
+            if (!d.custom_percentage) {
+                frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap', '');
+                frappe.throw("Please first apply percentage for item");
             } else {
-                console.log("int_lrp",int_lrp)
-                let stringValue = int_lrp.toString();
-                let modifiedString = stringValue.slice(0, -1) + '9';
-                lrpValue = parseFloat(modifiedString);
-                console.log("lrppp",lrpValue)
+                let custom_percentage = (d.custom_percentage / 100) * d.rate;
+                let lrpValue = custom_percentage + d.rate;
+        
+                // Ensure lrpValue is an integer
+                lrpValue = Math.floor(lrpValue);
+        
+                // Adjust lrpValue to end with 9
+                if (lrpValue % 10 !== 9) {
+                    lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                }
+        
+                let discount_on_mrp = d.custom_mrp - lrpValue;
+                let dis = (discount_on_mrp * 100) / d.custom_mrp;
+                let custom_discount = Math.round(dis);
+        
+                // If the discount is less than 15%, adjust the LRP to give a 15% discount
+                if (custom_discount < 15) {
+                    lrpValue = Math.floor(d.custom_mrp * 0.85);
+        
+                    // Adjust lrpValue to end with 9
+                    if (lrpValue % 10 !== 9) {
+                        lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                    }
+        
+                    // Recalculate the discount after adjusting lrpValue
+                    discount_on_mrp = d.custom_mrp - lrpValue;
+                    dis = (discount_on_mrp * 100) / d.custom_mrp;
+                    custom_discount = Math.round(dis);
+                }
+        
+                // Calculate margin
+                let discount_on_margin = lrpValue - d.rate;
+                let margin = (discount_on_margin / d.rate) * 100;
+        
+                frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
+                frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
+                frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
             }
         }
-
-            let discount_on_mrp = d.custom_mrp - lrpValue;
-            let dis = (discount_on_mrp * 100) / d.custom_mrp;
-            let custom_discount = Math.round(dis / 10) * 10;
-
-            // #calculate margin
-            let discount_on_margin = lrpValue - d.rate;
-            let margin = (discount_on_margin / d.rate * 100);
-            
-            frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
-            frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
-            frappe.model.set_value(cdt, cdn, 'custom_margin',margin);
-        }} else if (d.custom_ppmumrpdap === 'MRPD') {
-            if(!d.custom_percentage){
-                frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap','')
-                frappe.throw("please first apply percentage for item")}
-            else{
-            // Apply logic for MRPD
-            let discount = (d.custom_mrp * d.custom_percentage / 100);
-            let lrpValue = d.custom_mrp - discount;
-             if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
-            let int_lrp = Math.floor(lrpValue);
-            if (int_lrp % 10 === 9) {
-                lrpValue = int_lrp;
-                console.log("intr",lrpValue)
+        
+        
+        
+        else if (d.custom_ppmumrpdap === 'MRPD') {
+            if (!d.custom_percentage) {
+                frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap', '');
+                frappe.throw("Please first apply percentage for item");
             } else {
-                let stringValue = int_lrp.toString();
-                let modifiedString = stringValue.slice(0, -1) + '9';
-                lrpValue = parseFloat(modifiedString);
-                console.log("llll",lrpValue)
+                // Apply logic for MRPD
+                let discount = (d.custom_mrp * d.custom_percentage / 100);
+                let lrpValue = d.custom_mrp - discount;
+        
+                // Ensure lrpValue is an integer and ends with 9
+                lrpValue = Math.floor(lrpValue);
+                if (lrpValue % 10 !== 9) {
+                    lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                }
+        
+                let discount_on_mrp = d.custom_mrp - lrpValue;
+                let dis = (discount_on_mrp * 100) / d.custom_mrp;
+                let custom_discount = Math.round(dis);
+        
+                // If the discount is less than 15%, adjust the LRP to give a 15% discount
+                if (custom_discount < 15) {
+                    lrpValue = Math.floor(d.custom_mrp * 0.85);
+        
+                    // Ensure lrpValue ends with 9
+                    if (lrpValue % 10 !== 9) {
+                        lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                    }
+        
+                    // Recalculate the discount after adjusting lrpValue
+                    discount_on_mrp = d.custom_mrp - lrpValue;
+                    dis = (discount_on_mrp * 100) / d.custom_mrp;
+                    custom_discount = Math.round(dis);
+                }
+        
+                // Calculate margin
+                let discount_on_margin = lrpValue - d.rate;
+                let margin = (discount_on_margin / d.rate) * 100;
+        
+                frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
+                frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
+                frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
             }
         }
-            let discount_on_margin = lrpValue - d.rate;
-            console.log("discount_on_margin",discount_on_margin)
-            let margin = (discount_on_margin / d.rate * 100);
-            console.log("margin",margin)
-            let discount_on_mrp = d.custom_mrp - lrpValue;
-            let custom_discount = Math.round((discount_on_mrp * 100) / d.custom_mrp);
-          
-            frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
-            frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
-            frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
-        }}
+        
     },
 
     custom_percentage: function(frm, cdt, cdn) {

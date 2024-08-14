@@ -9,6 +9,7 @@
  "field_order": [
   "itemtab_tab",
   "item",
+  "column_break_en0by",
   "amazon_section",
   "asin_no",
   "column_break_1zxqb",
@@ -472,11 +473,15 @@
    "fieldtype": "Table MultiSelect",
    "label": "Item Groups",
    "options": "Item group ms"
+  },
+  {
+   "fieldname": "column_break_en0by",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-06 17:07:03.771588",
+ "modified": "2024-08-14 15:30:07.913660",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Item Details",

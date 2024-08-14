@@ -13,6 +13,8 @@
   "rate",
   "per",
   "disc_",
+  "disc2",
+  "disc3",
   "disc",
   "amount",
   "gst",
@@ -52,12 +54,12 @@
   {
    "fieldname": "disc_",
    "fieldtype": "Data",
-   "label": "Disc. %"
+   "label": "Disc%1"
   },
   {
    "fieldname": "disc",
    "fieldtype": "Data",
-   "label": "Disc"
+   "label": "GST Disc"
   },
   {
    "fieldname": "amount",
@@ -99,12 +101,22 @@
    "fieldname": "sub_category",
    "fieldtype": "Data",
    "label": " Sub Category"
+  },
+  {
+   "fieldname": "disc2",
+   "fieldtype": "Percent",
+   "label": "Disc%2"
+  },
+  {
+   "fieldname": "disc3",
+   "fieldtype": "Percent",
+   "label": "Disc%3"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-06 11:58:20.509485",
+ "modified": "2024-08-14 14:43:21.360913",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Custom Purchase Item",

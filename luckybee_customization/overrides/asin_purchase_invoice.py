@@ -54,8 +54,8 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			row = item.append("taxes", {})
 			row.item_tax_template = gst
 
-			# item.opening_stock=rate
-			# item.standard_rate=rate
+			item.opening_stock=qty
+			item.standard_rate=rate
 			# item.size=qty
 			item.insert(ignore_permissions=True)
 			item.custom_barcode = item.item_code

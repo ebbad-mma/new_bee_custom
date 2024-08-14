@@ -7,7 +7,6 @@ from frappe.utils import today
 @frappe.whitelist()
 def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, disc, gst, mrp, lrp, brand, group, category, sub_category):
 	doc = json.loads(doc)
-
 	dict_itm = {}
 	if description :
 
@@ -25,6 +24,19 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 
 			
 		item_code_exist = frappe.db.exists('Item', {'item_name':description}, 'item_code')
+		if item_code_exist:
+			item=frappe.get_doc('Item',{'item_name':description})
+			if item.custom_last_supplier:
+				last_supplier=item.custom_last_supplier
+				if item.custom_last_supplier!=doc['supplier']:
+					item.custom_last_supplier=doc['supplier']
+					item.append('custom_supplier_history',{'supplier':last_supplier})
+			frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
+			item.opening_stock+=float(qty)
+			frappe.log_error("before save",f"{item.opening_stock} {item.name}")
+			item.save()
+			frappe.log_error("after save",f"{item.opening_stock} {item.name}")
+
 
 		if not item_code_exist:
 			item = frappe.new_doc("Item")
@@ -36,6 +48,11 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			item.item_group = 'All Groups'
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
+			item.custom_last_supplier=doc['supplier']
+			if brand=='ASSR':
+				brand='TREO'
+			if brand=="CLAY":
+				brand='CLAY CRAFT'
 			item.custom_luckybee_brand = brand
 			item.custom_group = group
 
@@ -58,7 +75,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			# --------------------comment for now-----------------
 
 
-			item.opening_stock=rate
+			item.opening_stock=qty
 			item.standard_rate=rate
 			item.size=qty
 			item.save()
