@@ -9,7 +9,6 @@ frappe.ui.form.on('Item', {
             });
         }
 
-
         // display specification from html to normal
         // show_specification(frm)
 
@@ -18,35 +17,36 @@ frappe.ui.form.on('Item', {
         //     var n = frappe.new_doc("Product Finder", {item:frm.doc.name,title: frm.doc.item_name, brand: frm.doc.brand, color:frm.doc.color})
         //     console.log("return of new_doc", n);
         // });
-        // if (! frm.doc.custom_published)
-        // {frm.add_custom_button("Publish Item", function(){            
-        //     frappe.call({
-        //         args: {
-        //             doc : frm.doc
-        //         },
-        //         method: "luckybee_customization.luckybee_customization.hook_events.publish_item_to_woocom.publish_item",
-        //         callback: function(r){
-        //             // frm.realod_doc();
-        //             frm.refresh_fields();
-        //             frappe.msgprint(r.message)
-        //         }
-        //     })
-        // })}
-        // else{
-        //     frm.add_custom_button("Unpublish Item", function(){
-        //         frappe.call({
-        //             args: {
-        //                 doc : frm.doc
-        //             },
-        //             method: "luckybee_customization.luckybee_customization.hook_events.publish_item_to_woocom.unpublish_item",
-        //             callback: function(r){
-        //                 // frm.realod_doc();
-        //                 frm.refresh_fields();
-        //                 frappe.msgprint(r.message)
-        //             }
-        //         })
-            // })  
-        // }
+        if (! frm.doc.custom_published)
+        {frm.add_custom_button("Publish Item", function(){            
+            frappe.call({
+                args: {
+                    doc : frm.doc
+                },
+                method: "luckybee_customization.woocommerce.publish_item.publish_item",
+                        
+                callback: function(r){
+                    cur_frm.refresh()
+                    frm.refresh_fields();
+                    frappe.msgprint(r.message)
+                }
+            })
+        })}
+        else{
+            frm.add_custom_button("Unpublish Item", function(){
+                frappe.call({
+                    args: {
+                        doc : frm.doc
+                    },
+                    method: "luckybee_customization.woocommerce.publish_item.unpublish_item",
+                    callback: function(r){
+                        cur_frm.refresh()
+                        frm.refresh_fields();
+                        frappe.msgprint(r.message)
+                    }
+                })
+            })  
+        }
     }
 })
 

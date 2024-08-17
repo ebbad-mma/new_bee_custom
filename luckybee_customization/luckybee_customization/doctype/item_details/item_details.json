@@ -318,7 +318,8 @@
   {
    "fieldname": "url_amazon",
    "fieldtype": "Data",
-   "label": "URL Amazon"
+   "label": "URL Amazon",
+   "options": "URL"
   },
   {
    "fieldname": "launchpad",
@@ -481,7 +482,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-14 15:30:07.913660",
+ "modified": "2024-08-16 18:29:08.519278",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Item Details",

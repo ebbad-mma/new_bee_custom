@@ -136,10 +136,12 @@ doctype_js = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"luckybee_customization.tasks.all"
-# 	],
+scheduler_events = {
+  "cron": {
+    "0 */2 * * *": [
+        "luckybee_customization.woocommerce.update_webhook_status.update_webhook_status_by_scheduler"
+    ]
+}
 # 	"daily": [
 # 		"luckybee_customization.tasks.daily"
 # 	],
@@ -152,7 +154,7 @@ doctype_js = {
 # 	"monthly": [
 # 		"luckybee_customization.tasks.monthly"
 # 	],
-# }
+}
 
 # Testing
 # -------
@@ -231,8 +233,16 @@ doctype_js = {
 # }
 
 doc_events = {"Item": {
-		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
-		"on_update": "luckybee_customization.overrides.item_utils.check_image"
+		"before_save": "luckybee_customization.overrides.item.sync_keepa_item"
+		# "on_update": "luckybee_customization.overrides.item_utils.check_image"
+        }
+        ,
+        "Purchase Invoice": {
+		"on_submit": "luckybee_customization.overrides.bin.update_stock_in_hand"
+        },
+        "Branch": {
+		"validate": "luckybee_customization.woocommerce.test.test"
+		# "validate": "luckybee_customization.woocommerce.test2.test"
         }
     }
 

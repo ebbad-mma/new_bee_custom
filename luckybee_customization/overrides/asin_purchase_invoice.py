@@ -17,6 +17,23 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 		# item_nt_exist=frappe.db.exists("Item", {"name":custom_purchase_item})
 		frappe.log_error(f"{description}")
 		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
+		if item_code_exist:
+			item=frappe.get_doc('Item',{'item_name':description})
+			supplierNrate={'last_supplier':[],"last_rate":[]}
+			if item.custom_last_supplier:
+				supplierNrate['last_supplier'].append(item.custom_last_supplier)
+				supplierNrate['last_rate'].append(item.custom_last_supplier_purchase_rate)
+				# if item.custom_last_supplier!=doc['supplier']:
+				item.custom_last_supplier=doc['supplier']
+				item.custom_last_supplier_purchase_rate=float(rate)
+				supplierNrate['last_supplier'].append(doc['supplier'])
+				supplierNrate['last_rate'].append(float(rate))
+				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
+			# frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
+			# item.opening_stock+=float(qty)
+			# frappe.log_error("before save",f"{item.opening_stock} {item.name}")
+			item.save()
 		# if disc_perc: 
 		# 	rate = float(rate)
 		# 	disc_perc = float(disc_perc)
@@ -27,6 +44,8 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			# item.naming_series = 'L.#####'
 			item.item_code=item.naming_series
 			# item.item_code=custom_purchase_item
+			item.custom_last_supplier=doc['supplier']
+			item.custom_last_supplier_purchase_rate=float(rate)
 			item.stoc_uom = per
 			item.gst_hsn_code = ''
 			item.item_name = description
@@ -54,7 +73,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			row = item.append("taxes", {})
 			row.item_tax_template = gst
 
-			item.opening_stock=qty
+			# item.opening_stock=qty
 			item.standard_rate=rate
 			# item.size=qty
 			item.insert(ignore_permissions=True)

@@ -26,14 +26,20 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 		item_code_exist = frappe.db.exists('Item', {'item_name':description}, 'item_code')
 		if item_code_exist:
 			item=frappe.get_doc('Item',{'item_name':description})
+			supplierNrate={'last_supplier':[],"last_rate":[]}
 			if item.custom_last_supplier:
-				last_supplier=item.custom_last_supplier
-				if item.custom_last_supplier!=doc['supplier']:
-					item.custom_last_supplier=doc['supplier']
-					item.append('custom_supplier_history',{'supplier':last_supplier})
-			frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
-			item.opening_stock+=float(qty)
-			frappe.log_error("before save",f"{item.opening_stock} {item.name}")
+				supplierNrate['last_supplier'].append(item.custom_last_supplier)
+				supplierNrate['last_rate'].append(item.custom_last_supplier_purchase_rate)
+				# if item.custom_last_supplier!=doc['supplier']:
+				item.custom_last_supplier=doc['supplier']
+				item.custom_last_supplier_purchase_rate=float(rate)
+				supplierNrate['last_supplier'].append(doc['supplier'])
+				supplierNrate['last_rate'].append(float(rate))
+				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
+			# frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
+			# item.opening_stock+=float(qty)
+			# frappe.log_error("before save",f"{item.opening_stock} {item.name}")
 			item.save()
 			frappe.log_error("after save",f"{item.opening_stock} {item.name}")
 
@@ -49,6 +55,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_last_supplier=doc['supplier']
+			item.custom_last_supplier_purchase_rate=float(rate)
+			# item.append('custom_supplier_history',{'supplier':doc['supplier'],'rate':float(rate)})
 			if brand=='ASSR':
 				brand='TREO'
 			if brand=="CLAY":
@@ -75,7 +83,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			# --------------------comment for now-----------------
 
 
-			item.opening_stock=qty
+			# item.opening_stock=qty
 			item.standard_rate=rate
 			item.size=qty
 			item.save()
@@ -148,6 +156,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 		
 		# dict_itm.update({"item_code": frappe.db.get_value("Item", {"item_name": description}, 'item_code'),
 		# 					"qty": qty, "item_name": description, "uom": "Nos", "rate": rate, "amount": int(qty)*int(rate)})
+		frappe.log_error("last save",f"{item.opening_stock} {item.name}")
 		return dict_itm
 
 
