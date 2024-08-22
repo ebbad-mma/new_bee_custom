@@ -8,7 +8,7 @@ frappe.ui.form.on('Goods Received Note - GRN', {
 	    
 	    console.log("purchase invoice triggered", frm.doc.custom_index);
 	    frappe.call({
-	        method: "luckybee_customization.luckybee_customization.api.GRN.get_fields",
+	        method: "luckybee_customization.GRN.GRN.get_fields",
 	        args: {"purchase_invoice" : frm.doc.purchase_invoice},
 	        callback: function(r) {
 	            elem_list= r["message"]['res_list'];
@@ -140,7 +140,7 @@ frappe.ui.form.on('Goods Received Note - GRN', {
 	   if (frm.doc.quality_check != "" && frm.doc.received_quantity != ""){
     	   let item_name = elem_list[frm.doc.custom_index]['name'];
     	    frappe.call({
-    	        method: "luckybee_customization.luckybee_customization.api.GRN.update_data",
+    	        method: "luckybee_customization.GRN.GRN.update_data",
     	        args: {"doc":frm.doc,'item_name':item_name},
     	        callback: function(r){
     	            console.log(r);

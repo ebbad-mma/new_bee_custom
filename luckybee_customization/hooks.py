@@ -31,6 +31,8 @@ app_license = "mit"
 doctype_js = {
     "Purchase Invoice" : "public/js/purchase_invoice.js",
     "Item" : "public/js/item.js",
+    'Goods Received Note - GRN' : "public/js/Grn.js",
+    'Item Details' : "public/js/item_details.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -233,8 +235,8 @@ scheduler_events = {
 # }
 
 doc_events = {"Item": {
-		"before_save": "luckybee_customization.overrides.item.sync_keepa_item"
-		# "on_update": "luckybee_customization.overrides.item_utils.check_image"
+		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
+		"on_update": "luckybee_customization.overrides.item_utils.check_image"
         }
         ,
         "Purchase Invoice": {

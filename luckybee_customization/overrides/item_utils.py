@@ -8,22 +8,18 @@ def check_image(doc,method=None):
     #         else:
     #             doc.db_set('custom_image1',i.image)
     #create item details
-    # if doc.custom_asin_no:
-    #     item=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
-    #     item.item=doc.name
-    #     item.save()
-    # elif doc.custom_ean:
-    #     item=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
-    #     item.item=doc.name
-    #     item.save()
-    # elif doc.custom_fsn_no:
-    #     item=frappe.get_doc('Item Details',{'fsn_no':doc.custom_fsn_no})
-    #     item.item=doc.name
-    #     item.save()
-
-    # # update_stock_in_hand(doc,method=None):
-    # bin=frappe.get_doc('Bin',{'item_code':doc.name})
-    # doc.db_set('custom_stock_in_hand',bin.actual_qty)
+    if doc.custom_asin_no:
+        item=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
+        item.item=doc.name
+        item.save()
+    elif doc.custom_ean:
+        item=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
+        item.item=doc.name
+        item.save()
+    elif doc.custom_fsn_no:
+        item=frappe.get_doc('Item Details',{'fsn_no':doc.custom_fsn_no})
+        item.item=doc.name
+        item.save()
 
 
 

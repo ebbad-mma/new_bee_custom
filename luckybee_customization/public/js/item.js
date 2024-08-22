@@ -51,7 +51,3 @@ frappe.ui.form.on('Item', {
 })
 
 
-// function show_specification(frm) {
-//     let template = '';
-// 		template =frm.doc.custom_specification_html_data;
-//         $(frm.fields_dict.custom_specification.wrapper).html(template);}

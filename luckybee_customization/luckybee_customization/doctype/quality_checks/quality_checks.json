@@ -1,0 +1,333 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:QC-{purchase_invoice}-{item_code}-{###}",
+ "creation": "2024-08-22 16:56:09.791838",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "purchase_invoice",
+  "item_code",
+  "product_condition_section",
+  "damaged",
+  "section_break_9kh9p",
+  "main_damaged",
+  "hole_main",
+  "torn_main",
+  "marks_main",
+  "scratched_main",
+  "column_break_1vill",
+  "part_damaged",
+  "hole_part",
+  "torn_part",
+  "marks_part",
+  "scratched_part",
+  "section_break_jphu0",
+  "short",
+  "main_short",
+  "section_break_jngew",
+  "received",
+  "part_short",
+  "importance",
+  "column_break_ueewl",
+  "out_of",
+  "section_break_pmdot",
+  "section_break_sl2ya",
+  "section_break_nsdem",
+  "not_working",
+  "column_break_mbgef",
+  "image",
+  "click_photo_section",
+  "resolution_section",
+  "offer_discount",
+  "buy_part",
+  "repair",
+  "scrap",
+  "qc_pass"
+ ],
+ "fields": [
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice",
+   "reqd": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item code",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "product_condition_section",
+   "fieldtype": "Section Break",
+   "label": "Product Condition"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "fieldname": "damaged",
+   "fieldtype": "Check",
+   "label": "Damaged"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval:doc.damaged",
+   "fieldname": "section_break_9kh9p",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.damaged",
+   "fieldname": "main_damaged",
+   "fieldtype": "Check",
+   "label": "Main Product"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.main_damaged",
+   "fieldname": "hole_main",
+   "fieldtype": "Check",
+   "label": "Hole"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.main_damaged",
+   "fieldname": "torn_main",
+   "fieldtype": "Check",
+   "label": "Torn"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.main_damaged",
+   "fieldname": "marks_main",
+   "fieldtype": "Check",
+   "label": "Marks"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.main_damaged",
+   "fieldname": "scratched_main",
+   "fieldtype": "Check",
+   "label": "Scratched"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "column_break_1vill",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.damaged",
+   "fieldname": "part_damaged",
+   "fieldtype": "Check",
+   "label": "Part"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.part_damaged",
+   "fieldname": "hole_part",
+   "fieldtype": "Check",
+   "label": "Hole"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.part_damaged",
+   "fieldname": "torn_part",
+   "fieldtype": "Check",
+   "label": "Torn"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.part_damaged",
+   "fieldname": "marks_part",
+   "fieldtype": "Check",
+   "label": "Marks"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.part_damaged",
+   "fieldname": "scratched_part",
+   "fieldtype": "Check",
+   "label": "Scratched"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "section_break_jphu0",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "fieldname": "short",
+   "fieldtype": "Check",
+   "label": "Short"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.short==1",
+   "fieldname": "main_short",
+   "fieldtype": "Check",
+   "label": "Main"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "section_break_jngew",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval:doc.main_short==1",
+   "fieldname": "received",
+   "fieldtype": "Int",
+   "label": "Receive"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:doc.short==1",
+   "fieldname": "part_short",
+   "fieldtype": "Check",
+   "label": "Part"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "importance",
+   "fieldtype": "Select",
+   "label": "Importance",
+   "options": "Low\nHigh",
+   "print_width": "60px",
+   "width": "10px"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "column_break_ueewl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval:doc.main_short==1",
+   "fieldname": "out_of",
+   "fieldtype": "Int",
+   "label": "Out of"
+  },
+  {
+   "fieldname": "section_break_pmdot",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_sl2ya",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "section_break_nsdem",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "fieldname": "not_working",
+   "fieldtype": "Check",
+   "label": "Not Working"
+  },
+  {
+   "fieldname": "column_break_mbgef",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach",
+   "label": "Image"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "click_photo_section",
+   "fieldtype": "Section Break",
+   "label": "Click Photo"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "resolution_section",
+   "fieldtype": "Section Break",
+   "label": "Resolution"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "offer_discount",
+   "fieldtype": "Select",
+   "label": "Offer Discount",
+   "options": "25\n50"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "fieldname": "buy_part",
+   "fieldtype": "Check",
+   "label": "Buy Part"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "fieldname": "repair",
+   "fieldtype": "Check",
+   "label": "Repair"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "fieldname": "scrap",
+   "fieldtype": "Check",
+   "label": "Scrap"
+  },
+  {
+   "fieldname": "qc_pass",
+   "fieldtype": "Select",
+   "label": "QC Pass",
+   "options": "\nYes\nNo"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-08-22 16:56:09.791838",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Quality Checks",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

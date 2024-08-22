@@ -702,6 +702,7 @@ def sync_keepa_item(doc, event):
 		data = scrape(fsn)
 
 		doc.item_name = data['title']
+		doc.description = data['description']
 		item_detail.set('item_groups', [])
 
 		for category in data['categories']:
@@ -721,15 +722,20 @@ def sync_keepa_item(doc, event):
 		doc.image = data['image_url']
 		set_images(doc, data['multiple_images'])
 
-		doc.custom_model_fk = data['specifications'].get('General', {}).get('Model Name', "")
+		item_detail.model_flipkart = data['specifications'].get('General', {}).get('Model Name', "")
 		dims = data['specifications'].get("Dimensions", {})
 		item_detail.length_breadth = dims.get('Width', "")
 		item_detail.length_height = dims.get('Height', "")
 
 		doc.custom_mrp = data['price']
 		item_detail.title_flipkart = data['title']
+		item_detail.flipkart_rating = data['rating']
+		reviews=data['reviews'].split(" ")[0]
+		item_detail.flipkart_reviews_count =reviews
+		item_detail.flipkart_ratings_count = data['ratings']
 		item_detail.fsn_no = doc.custom_fsn_no
-		item_detail.specification = str(data['general'])
+		item_detail.flipkart_dis_per =data['discount']
+		item_detail.spec_html_data = str(data['general'])
 		item_detail.save()
 		doc.custom_item_detail=item_detail.name
 

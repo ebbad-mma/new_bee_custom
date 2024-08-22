@@ -27,7 +27,7 @@ def update_webhook_status():
     }
 
     # Example: Update a specific webhook (change '7' to your desired webhook ID)
-    webhook_id = 7
+    webhook_id = 8
     response = wcapi.put(f"webhooks/{webhook_id}", data).json()
 
     # Example: Logging response

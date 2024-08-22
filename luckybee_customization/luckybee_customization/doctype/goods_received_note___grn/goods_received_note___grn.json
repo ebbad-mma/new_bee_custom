@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-08-22 16:31:19.156543",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "purchase",
+  "product",
+  "purchase_quantity",
+  "received_quantity",
+  "brand",
+  "mrp",
+  "ean",
+  "subcategory",
+  "quality_check",
+  "print_barcode",
+  "column_break_column",
+  "purchase_invoice",
+  "amended_from",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "purchase",
+   "fieldtype": "Select",
+   "label": "Purchase",
+   "options": "Non Asin\nAsin"
+  },
+  {
+   "fieldname": "product",
+   "fieldtype": "Link",
+   "label": "Product",
+   "options": "Item"
+  },
+  {
+   "fieldname": "purchase_quantity",
+   "fieldtype": "Data",
+   "label": "Purchase Quantity"
+  },
+  {
+   "fieldname": "received_quantity",
+   "fieldtype": "Data",
+   "label": "Received Quantity"
+  },
+  {
+   "fetch_from": "product.brand",
+   "fieldname": "brand",
+   "fieldtype": "Data",
+   "label": "Brand"
+  },
+  {
+   "fetch_from": "product.custom_mrp",
+   "fieldname": "mrp",
+   "fieldtype": "Data",
+   "label": "MRP"
+  },
+  {
+   "fetch_from": "product.ean",
+   "fieldname": "ean",
+   "fieldtype": "Data",
+   "label": "EAN"
+  },
+  {
+   "fetch_from": "product.custom_sub_category",
+   "fieldname": "subcategory",
+   "fieldtype": "Data",
+   "label": "Subcategory"
+  },
+  {
+   "fieldname": "quality_check",
+   "fieldtype": "Select",
+   "label": "QC Pass (Yes/No)",
+   "options": "\nYes\nNo"
+  },
+  {
+   "fieldname": "print_barcode",
+   "fieldtype": "Button",
+   "label": "Print Barcode"
+  },
+  {
+   "fieldname": "column_break_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Goods Received Note - GRN",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Goods Received Note - GRN",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-08-22 16:31:19.156543",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Goods Received Note - GRN",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

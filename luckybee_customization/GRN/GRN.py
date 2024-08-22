@@ -17,12 +17,12 @@ def get_fields(purchase_invoice):
         # if brand:
         #     res["brand"] = brand[0]                
         res["brand"] = item_doc.brand
-        if item_doc.last_price:
-            res['mrp'] = item_doc.last_price
-        elif item_doc.list_price_highest:
-            res['mrp'] = item_doc.list_price_highest
-        res["ean"] = item_doc.ean
-        res["subcategory"] = item_doc.custom_sub_category
+        if item_doc.custom_last_price:
+            res['mrp'] = item_doc.custom_last_price
+        elif item_doc.custom_list_price_highest:
+            res['mrp'] = item_doc.custom_list_price_highest
+        res["ean"] = item_doc.custom_ean
+        res["subcategory"] = item_doc.custom_category_sub
         image_list = []
         for i in range(1,6+1):
             f = f"custom_image{i}"
