@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-08-23 16:20:01.196411",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "asin_no",
+  "mrp",
+  "image",
+  "title",
+  "categories_sub",
+  "column_break_z8efm",
+  "online_price",
+  "part_number",
+  "model",
+  "color",
+  "size",
+  "create_item",
+  "discount"
+ ],
+ "fields": [
+  {
+   "fieldname": "asin_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Asin no"
+  },
+  {
+   "fieldname": "mrp",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "List Price"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "in_preview": 1,
+   "label": "Image"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "categories_sub",
+   "fieldtype": "Data",
+   "label": "Categories_Sub"
+  },
+  {
+   "fieldname": "column_break_z8efm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "online_price",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "New Current"
+  },
+  {
+   "fieldname": "part_number",
+   "fieldtype": "Data",
+   "label": "Part Number"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Data",
+   "label": "Color"
+  },
+  {
+   "fieldname": "size",
+   "fieldtype": "Data",
+   "label": "Size"
+  },
+  {
+   "fieldname": "create_item",
+   "fieldtype": "Button",
+   "label": "Select Item"
+  },
+  {
+   "fieldname": "discount",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Discount"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-08-23 16:53:13.054836",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Product Finder Response",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

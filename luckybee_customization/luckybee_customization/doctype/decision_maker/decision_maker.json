@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-08-23 17:19:46.614330",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "box_number",
+  "total_margin",
+  "rate",
+  "margin_",
+  "spacer"
+ ],
+ "fields": [
+  {
+   "fieldname": "box_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Box Number"
+  },
+  {
+   "fieldname": "total_margin",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Margin",
+   "precision": "2"
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Rate",
+   "precision": "2"
+  },
+  {
+   "fieldname": "margin_",
+   "fieldtype": "Percent",
+   "in_standard_filter": 1,
+   "label": "Margin %",
+   "precision": "2"
+  },
+  {
+   "fieldname": "spacer",
+   "fieldtype": "Data"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-08-23 17:19:46.614330",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Decision Maker",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

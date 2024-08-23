@@ -118,8 +118,8 @@ def scrape(fsn):
 	data['general']=modified_html
 	# data['general']=specs
 	data['description'] = ""
-	description = soup.find('div', class_='_4gvKMe').text
-	data['description'] = description
+	# description = soup.find('div', class_='_4gvKMe').text
+	# data['description'] = description
 	data['highlights'] = []
 	try:
 		# print("Highlights")

@@ -32,7 +32,8 @@ doctype_js = {
     "Purchase Invoice" : "public/js/purchase_invoice.js",
     "Item" : "public/js/item.js",
     'Goods Received Note - GRN' : "public/js/Grn.js",
-    'Item Details' : "public/js/item_details.js"
+    'Item Details' : "public/js/item_details.js",
+    'Supplier Quotation' : "public/js/supplier_quotation.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -240,7 +241,8 @@ doc_events = {"Item": {
         }
         ,
         "Purchase Invoice": {
-		"on_submit": "luckybee_customization.overrides.bin.update_stock_in_hand"
+		"on_submit": "luckybee_customization.overrides.bin.update_stock_in_hand",
+		"before_submit": "luckybee_customization.overrides.bin.set_warehouse_and_update_stock"
         },
         "Branch": {
 		"validate": "luckybee_customization.woocommerce.test.test"

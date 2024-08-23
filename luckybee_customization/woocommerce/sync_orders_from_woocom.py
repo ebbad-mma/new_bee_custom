@@ -66,12 +66,12 @@ def get_orders():
 			frappe.log_error(f"Error in customer creation or update: {str(e)}")
 
 		try:
-			if not frappe.db.exists('Address', {'custom_woocommerce_customer_id': cus_id}):
+			if not frappe.db.exists('Address', {'woocommerce_id': cus_id}):
 				# Create customer address
 				frappe.log_error("Start customer address creation")
 				cus_ads = frappe.new_doc('Address')
 				cus_ads.address_type = 'Billing'
-				cus_ads.custom_woocommerce_customer_id = cus_id
+				cus_ads.woocommerce_id = cus_id
 				cus_ads.address_line1 = billing_details['address_1']
 				cus_ads.address_line2 = billing_details['address_2']
 				cus_ads.city = billing_details['city']
@@ -86,7 +86,7 @@ def get_orders():
 				cus_ads.insert(ignore_permissions=True)
 				frappe.log_error("Address created")
 			else:
-				cus_ads = frappe.get_doc('Address', {'custom_woocommerce_customer_id': cus_id})
+				cus_ads = frappe.get_doc('Address', {'woocommerce_id': cus_id})
 				cus_ads.address_type = 'Billing'
 				cus_ads.custom_woocommerce_customer_id = cus_id
 				cus_ads.address_line1 = billing_details['address_1']
@@ -111,8 +111,8 @@ def get_orders():
 			sales_order = frappe.new_doc("Sales Invoice")
 			sales_order.customer = billing_details['first_name'] + " " + billing_details['last_name']
 			sales_order.custom_payment_request_url = response.get('payment_url')
-			sales_order.base_grand_total = 0
-			sales_order.grand_total = 0
+			# sales_order.base_grand_total = 0
+			# sales_order.grand_total = 0
 			payment_method = response.get('payment_method')
 			if payment_method=='cod':
 				sales_order.custom_payment_method ='Cash'
@@ -148,7 +148,6 @@ def get_orders():
 						item_doc.save()
 				except Exception as e:
 					frappe.log_error(f"Error in processing item {item_details['name']}: {str(e)}")
-			frappe.log_error("qqq",f"{item_doc.item_code}{item_details['quantity']}{item_details['total']}")
 			sales_order.append('items', {
 			'item_code': item_doc.item_code,
 			'qty': item_details['quantity'],

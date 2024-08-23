@@ -160,7 +160,7 @@ def update_item(doc, event):
 								item_detail.new_highest = new_highest[1]
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
-								doc.list_price_highest = highest_listprice[1]
+								doc.custom_list_price_highest = highest_listprice[1]
 					if doc.custom_ean:
 						item_detail.ean=doc.custom_ean
 					item_detail.item=doc.name
@@ -330,7 +330,7 @@ def update_item(doc, event):
 									item_detail.new_highest = new_highest[1]
 								highest_listprice = highest.get("LISTPRICE")
 								if highest_listprice and len(highest_listprice)==2:
-									doc.list_price_highest = highest_listprice[1]
+									doc.custom_list_price_highest = highest_listprice[1]
 						if doc.custom_asin_no:
 							item_detail.asin_no=doc.custom_asin_no			
 						item_detail.save()
@@ -501,7 +501,7 @@ def sync_keepa_item(doc, event):
 								item_detail.new_highest = new_highest[1]
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
-								doc.list_price_highest = highest_listprice[1]
+								doc.custom_list_price_highest = highest_listprice[1]
 				if doc.custom_ean:
 					item_detail.ean=doc.custom_ean
 				item_detail.save()
@@ -666,7 +666,7 @@ def sync_keepa_item(doc, event):
 								item_detail.new_highest = new_highest[1]
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
-								doc.list_price_highest = highest_listprice[1]
+								doc.custom_list_price_highest = highest_listprice[1]
 				# item_detail.item=doc.name	
 				if doc.custom_asin_no:
 					item_detail.asin_no=doc.custom_asin_no			

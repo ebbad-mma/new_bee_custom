@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-08-23 16:20:10.527746",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "root_category",
+  "sub_category",
+  "brand",
+  "model",
+  "color",
+  "size",
+  "part_number",
+  "column_break_olsqe",
+  "item",
+  "selected_item",
+  "section_break_gqioh",
+  "product_finder_response",
+  "create_selected_items"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title"
+  },
+  {
+   "fieldname": "root_category",
+   "fieldtype": "Select",
+   "label": "Root Category",
+   "options": "\nKindle Store\nBags, Wallets and Luggage\nToys & Games\nFashion\nBaby\nHome Improvement\nAlexa Skills\nVideo Games\nClothing & Accessories\nCar & Motorbike\nMusic\nJewellery\nBooks\nHome & Kitchen\nBeauty\nSports, Fitness & Outdoors\nPet Supplies\nHealth & Personal Care\nApps for Android\nSoftware\nElectronics\nGrocery & Gourmet Foods\nWatches\nIndustrial & Scientific\nMovies & TV Shows\nComputers & Accessories\nOutdoor Living\nShoes & Handbags\nMusical Instruments\nOffice Products"
+  },
+  {
+   "fieldname": "sub_category",
+   "fieldtype": "Data",
+   "label": "Sub Category"
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Data",
+   "label": "Brand"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Data",
+   "label": "Color"
+  },
+  {
+   "fieldname": "size",
+   "fieldtype": "Data",
+   "label": "Size"
+  },
+  {
+   "fieldname": "part_number",
+   "fieldtype": "Data",
+   "label": "Part number"
+  },
+  {
+   "fieldname": "column_break_olsqe",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "selected_item",
+   "fieldtype": "Small Text",
+   "label": "Selected Item"
+  },
+  {
+   "fieldname": "section_break_gqioh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "product_finder_response",
+   "fieldtype": "Table",
+   "label": "Product Finder Response",
+   "options": "Product Finder Response"
+  },
+  {
+   "fieldname": "create_selected_items",
+   "fieldtype": "Button",
+   "label": "Create Selected Items"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-08-23 16:20:10.527746",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Product Finder",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

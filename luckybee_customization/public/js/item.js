@@ -9,14 +9,13 @@ frappe.ui.form.on('Item', {
             });
         }
 
-        // display specification from html to normal
-        // show_specification(frm)
+        // PRODUCT FINDER
+        frm.add_custom_button("Create Product Finder", function(){
+            var n = frappe.new_doc("Product Finder", {item:frm.doc.name,title: frm.doc.item_name, brand: frm.doc.brand, color:frm.doc.color})
+            console.log("return of new_doc", n);
+        });
 
-        
-        // frm.add_custom_button("Create Product Finder", function(){
-        //     var n = frappe.new_doc("Product Finder", {item:frm.doc.name,title: frm.doc.item_name, brand: frm.doc.brand, color:frm.doc.color})
-        //     console.log("return of new_doc", n);
-        // });
+        // PUBLISH ITEM 
         if (! frm.doc.custom_published)
         {frm.add_custom_button("Publish Item", function(){            
             frappe.call({
@@ -32,6 +31,8 @@ frappe.ui.form.on('Item', {
                 }
             })
         })}
+
+        // UNPUBLISH ITEM 
         else{
             frm.add_custom_button("Unpublish Item", function(){
                 frappe.call({

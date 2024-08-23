@@ -14,6 +14,11 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 
 	dict_itm = {}
 	if description :
+		#create Brand
+		if not frappe.db.exists('Brand',brand):
+			br=frappe.new_doc('Brand')
+			br.brand=brand
+			br.insert()
 		# item_nt_exist=frappe.db.exists("Item", {"name":custom_purchase_item})
 		frappe.log_error(f"{description}")
 		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
@@ -21,13 +26,14 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item=frappe.get_doc('Item',{'item_name':description})
 			supplierNrate={'last_supplier':[],"last_rate":[]}
 			if item.custom_last_supplier:
+				supplierNrate['last_supplier'].append(doc['supplier'])
+				supplierNrate['last_rate'].append(float(rate))
 				supplierNrate['last_supplier'].append(item.custom_last_supplier)
 				supplierNrate['last_rate'].append(item.custom_last_supplier_purchase_rate)
 				# if item.custom_last_supplier!=doc['supplier']:
 				item.custom_last_supplier=doc['supplier']
 				item.custom_last_supplier_purchase_rate=float(rate)
-				supplierNrate['last_supplier'].append(doc['supplier'])
-				supplierNrate['last_rate'].append(float(rate))
+				
 				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
 					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
 			# frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
@@ -53,6 +59,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_luckybee_brand = brand
+			item.brand = brand
 			item.custom_group = group
 			item.custom_category = category
 			item.custom_sub_category = sub_category
@@ -132,6 +139,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 						})
 	return dict_itm
 
+# ---------------------------create item price---------------------------------
 def create_item_price(item, lrp=None, discounted_price=None):
 	if not frappe.db.exists("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"}):
 		item_price = frappe.new_doc("Item Price")
@@ -155,21 +163,33 @@ def create_item_price(item, lrp=None, discounted_price=None):
 		item_price.price_list_rate = discounted_price
 		item_price.save()
 
-	else:
+	if frappe.db.exists('Item',item.item_code):
+		# -----------------comment for now---------------------
 		ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"})
+		frappe.log_error(f"{ip.price_list_rate}'   '{lrp}")
+		exists = any(d.price_list == 'Standard Selling' for d in item.custom_item_price_details)
+		if not exists:
+			item.append('custom_item_price_details',{'item_code': item.item_code,'uom':ip.uom,'item_price':ip.name,'rate':lrp,'price_list':'Standard Selling'})
+			item.save()
 		if str(ip.price_list_rate) != str(lrp):
 			ip.price_list_rate = lrp
 			ip.save()
 			for ipd in item.custom_item_price_details:
 				if ip.name == ipd.item_price:
 					ipd.rate = lrp
-			# item.save()
+			item.save()
 
 		ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Buying"})
+		frappe.log_error(f"{ip.price_list_rate}' ppp'{discounted_price}")
+		exists = any(d.price_list == 'Standard Buying' for d in item.custom_item_price_details)
+		if not exists:
+			item.append('custom_item_price_details',{'item_code': item.item_code,'uom':ip.uom,'price_list':'Standard Buying','rate':float(discounted_price),'item_price':ip.name})
+			item.save()
 		if str(ip.price_list_rate) != str(discounted_price):
 			ip.price_list_rate = discounted_price
 			ip.save()
 			for ipd in item.custom_item_price_details:
 				if ip.name == ipd.item_price:
 					ipd.rate = discounted_price
-		item.save()
+			item.save()
+		# -----------------comment for now---------------------
