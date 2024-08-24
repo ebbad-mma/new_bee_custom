@@ -1,11 +1,10 @@
 frappe.ui.form.on('Purchase Invoice', {
     custom_search_and_insert_item(frm,cdt,cdn) {
         let purchase =frm.doc.custom_custom_purchase_item;
-            if (purchase[0].custom_box_number || purchase[0].custom_asin || purchase[0].custom_ean){frm.doc.custom_is_asin =1}
-            else if (purchase[0].custom_fsn){frm.doc.custom_is_fsn =1}
+            if (purchase[0].custom_box_number || purchase[0].custom_asin || purchase[0].custom_ean){frm.set_value('custom_is_asin',1)}
+            else if (purchase[0].custom_fsn){frm.set_value('custom_is_fsn',1)}
             else { 
-                // frm.doc.custom_non_asin =1
-                frm.set_value("custom_non_asin",1)
+                {frm.set_value('custom_non_asin',1)}
             
             }
 
@@ -82,10 +81,44 @@ frappe.ui.form.on('Purchase Invoice', {
                 
                 
             // ---------------------------------fsn code------------------------------------------
-            else if(frm.doc.custom_fsn===1){frappe.msgprint("FSN")}
+            else if(frm.doc.custom_is_fsn===1){for (let obj of frm.doc.custom_custom_purchase_item) {
+                console.log("FSN Is calling")
+                frappe.call({
+                    method: "luckybee_customization.overrides.Fsn.search_and_insert_item",
+                    args: {
+                        'doc': frm.doc,
+                        'description': obj.description_of_good_and_services,
+                        'fsn': obj.custom_fsn != null ? obj.custom_fsn : "",
+                        'qty': obj.quantity != null ? obj.quantity : 0,
+                        'rate': obj.rate != null ? obj.rate : 0,
+                        'per': obj.per != null ? obj.per : 0,
+                        'mrp': obj.mrp != null ? obj.mrp : 0,
+                        'lrp': obj.lrp != null ? obj.lrp : 0
+                    },
+                    freeze: true,
+                    freeze_message: "loading items...",
+                    callback: function (r) {
+                        console.log(r.message, "r.message-------------");
+                        if (r.message) {
+                            console.log(r.message, "r.message-------------");
+                            var item_row = cur_frm.add_child("items");
+                            item_row.item_code = r.message.item_code;
+                            item_row.item_name = r.message.item_name;
+                            item_row.qty = r.message.qty;
+                            item_row.uom = r.message.uom;
+                            item_row.custom_mrp=r.message.custom_mrp;
+
+                            cur_frm.refresh_fields("items");
+                           
+                        }
+                    }
+                });
+            }
+            
+        }
             
         //    ------------------------------------------------------- non asin code-----------------------------------------------------------------------------
-            else {
+        else if(frm.doc.custom_non_asin===1){console.log("non",frm.doc.custom_non_asin)
                 for (let obj of frm.doc.custom_custom_purchase_item) {
 					console.log("non asin mmethod is calling")
                     frappe.call({
