@@ -157,6 +157,11 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.custom_mrp=r.message.custom_mrp;
 
                                 cur_frm.refresh_fields("items");
+                                if (cur_frm.is_new()) {
+                                    console.log("MEWWWWWWWWWWW")
+                                    frm.save();
+                                }
+                                
                                
                             }
                         }
