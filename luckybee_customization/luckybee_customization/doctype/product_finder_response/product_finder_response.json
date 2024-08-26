@@ -48,7 +48,7 @@
   },
   {
    "fieldname": "categories_sub",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Categories_Sub"
   },
   {
@@ -96,7 +96,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-23 16:53:13.054836",
+ "modified": "2024-08-26 13:09:34.120371",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Product Finder Response",

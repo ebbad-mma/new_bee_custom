@@ -17,6 +17,7 @@ def update_item(create_items,selected_item):
         doc.item_group ='All Groups'
         doc.custom_asin_no =asin_no
         doc.insert()
+        doc.db_set('item_name',doc.custom_amzon_item_name)
         frappe.msgprint("Item created sucessfully")
     else:
         item_doc=frappe.get_doc("Item",{'custom_asin_no':asin_no})

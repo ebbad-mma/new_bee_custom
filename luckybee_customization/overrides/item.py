@@ -506,7 +506,7 @@ def sync_keepa_item(doc, event):
 					item_detail.ean=doc.custom_ean
 				item_detail.save()
 				doc.custom_item_detail=item_detail.name
-				frappe.msgprint(_("Item(s) has been synced with keepa"))
+				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 
 	elif doc.custom_ean:
 		EAN = [doc.custom_ean]
@@ -671,7 +671,7 @@ def sync_keepa_item(doc, event):
 				if doc.custom_asin_no:
 					item_detail.asin_no=doc.custom_asin_no			
 				item_detail.save()
-				frappe.msgprint(_("Item(s) has been synced with keepa"))
+				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 	
 	elif doc.custom_url or doc.custom_fsn_no:
 		if doc.custom_url:
