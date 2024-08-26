@@ -20,6 +20,8 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				br=frappe.new_doc('Brand')
 				br.brand=brand
 				br.insert()
+		# item_nt_exist=frappe.db.exists("Item", {"name":custom_purchase_item})
+		frappe.log_error(f"{description}")
 		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
 		if item_code_exist:
 			item=frappe.get_doc('Item',{'item_name':description})
@@ -35,27 +37,16 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				
 				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
 					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
-			if item.custom_mrp and float(mrp) > 0 and float(item.custom_mrp) != float(mrp) :
-				item.custom_mrp = mrp
-			if item.gst_hsn_code != hsn:
-				item.gst_hsn_code = hsn
-			if item.custom_luckybee_brand != brand:
-				item.custom_luckybee_brand = brand
-			if item.custom_group != group:
-				item.custom_group = group
-			if item.custom_category != category:
-				item.custom_category = category
-			if item.custom_category_sub != sub_category:
-				item.custom_category_sub = sub_category
-			if not item.custom_barcode:
-				item.custom_barcode = item.item_code
-				barcode_row = item.append("barcodes", {})
-				barcode_row.barcode = item.item_code
+			# frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
+			# item.opening_stock+=float(qty)
+			# frappe.log_error("before save",f"{item.opening_stock} {item.name}")
 			item.save()
-			time.sleep(5)
-		# if not item_code_exist:
-		else:
-			int_mrp=float(mrp)
+		# if disc_perc: 
+		# 	rate = float(rate)
+		# 	disc_perc = float(disc_perc)
+		# 	discounted_price = rate - (rate * (disc_perc / 100))
+		int_mrp=float(mrp)
+		if not item_code_exist:
 			item = frappe.new_doc("Item")
 			# item.naming_series = 'L.#####'
 			item.item_code=item.naming_series
@@ -77,6 +68,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item.custom_box_number=custom_box_number
 			item.custom_ean = custom_ean
 			# item.custon_fsn_no = custom_fsn
+
 			
 			gst = ""
 			# if disc_perc:
@@ -93,15 +85,38 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item.standard_rate=rate
 			# item.size=qty
 			item.insert(ignore_permissions=True)
-			time.sleep(5)
 			item.custom_barcode = item.item_code
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
 			item.save()
 			# if disc_perc:
 			# 	create_item_price(item, lrp, discounted_price)
-		int_mrp=float(mrp)
-							
+		else:
+			item = frappe.get_doc("Item", item_code_exist)
+
+			# if disc_perc:
+			# 	create_item_price(item, lrp, discounted_price)
+			frappe.log_error(title="item code ", message = f'item starts with: {(item.item_code).startswith("L1")}, length: { len(item.item_code)} , item:{ item_code_exist}')
+			frappe.log_error(title="MRP", message = f'item.custom_mrp: {item.custom_mrp}, mrp: {mrp}')
+			if item and (item.item_code).startswith("L1") and len(item.item_code) == 6:
+				if item.custom_mrp and float(mrp) > 0 and float(item.custom_mrp) != float(mrp) :
+					item.custom_mrp = mrp
+				if item.gst_hsn_code != hsn:
+					item.gst_hsn_code = hsn
+				if item.custom_luckybee_brand != brand:
+					item.custom_luckybee_brand = brand
+				if item.custom_group != group:
+					item.custom_group = group
+				if item.custom_category != category:
+					item.custom_category = category
+				if item.custom_sub_category != sub_category:
+					item.custom_sub_category = sub_category
+				if not item.custom_barcode:
+					item.custom_barcode = item.item_code
+					barcode_row = item.append("barcodes", {})
+					barcode_row.barcode = item.item_code
+			item.save()
+			time.sleep(5)				
 		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest'])
 		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
 		last_price_safe = safe_int(last_price)
