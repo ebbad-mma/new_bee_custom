@@ -157,6 +157,13 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.custom_mrp=r.message.custom_mrp;
 
                                 cur_frm.refresh_fields("items");
+                                for (let item of frm.doc.custom_custom_purchase_item) {
+                                    console.log("ppppppppppppppppppppppppppppppppp",item.description_of_good_and_services ,r.message.item_name)
+                                    if (item.description_of_good_and_services === r.message.item_name) {
+                                        item.custom_synced =1;
+                                        // cur_frm.refresh_fields("custom_custom_purchase_item");
+                                    }
+                                }
                                
                             }
                         }
