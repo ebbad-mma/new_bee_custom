@@ -242,7 +242,8 @@ doc_events = {"Item": {
         ,
         "Purchase Invoice": {
 		"on_submit": "luckybee_customization.overrides.bin.update_stock_in_hand",
-		"before_submit": "luckybee_customization.overrides.bin.set_warehouse_and_update_stock"
+		"before_submit": "luckybee_customization.overrides.bin.set_warehouse_and_update_stock",
+		"on_update": "luckybee_customization.overrides.bin.enqueue_create_item_price"
         },
         "Branch": {
 		"validate": "luckybee_customization.woocommerce.test.test"

@@ -1,4 +1,5 @@
 import frappe
+from luckybee_customization.woocommerce.publish_item import get_woocommerce_settings
 def check_image(doc,method=None):
     # if not doc.custom_image1 and not doc.custom_image2 and not doc.custom_image3 and not doc.custom_image4 and not doc.custom_image5:
     #     image_list=doc.custom_image_list
@@ -20,6 +21,10 @@ def check_image(doc,method=None):
         item=frappe.get_doc('Item Details',{'fsn_no':doc.custom_fsn_no})
         item.item=doc.name
         item.save()
+
+
+
+
 
 
 

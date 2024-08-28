@@ -130,8 +130,6 @@ def get_orders():
 						item_doc.item_group = "All Groups"
 						item_doc.item_code = item_details['name']
 						item_doc.item_name = item_details['name']
-						item_doc.custom_published = 1
-						item_doc.sync_qty_with_woocommerce = 1
 						item_doc.woocommerce_product_id = item_details['product_id']
 						if item_image_url:
 							item_doc.image = item_image_url

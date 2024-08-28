@@ -37,13 +37,15 @@ frappe.ui.form.on('Purchase Invoice', {
                                 'custom_asin': obj.custom_asin != null ? obj.custom_asin : "",
                                 'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
                                 "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
-                                "disc": obj.disc != null ? flt(obj.disc) : 0
+                                "disc": obj.disc != null ? flt(obj.disc) : 0,
+                                "amount": obj.amount != null ? flt(obj.amount) : 0
 
                             },
                             freeze: true,
                             freeze_message: "loading items...",
                             callback: function (r) {
                                 if (r.message) {
+                                    console.log("R MESSAGE",r.message)
                                     var item_row = cur_frm.add_child("items");
                                     item_row.item_code = r.message.item_code;
                                     item_row.item_name = r.message.item_name;
@@ -54,7 +56,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                     item_row.custom_reviewsrating = r.message.reviews_rating;
                                     item_row.custom_reviews_count = r.message.custom_reviews_count;
                                     item_row.custom_last_purchase_rate=r.message.last_purchase_rate
-                                    item_row.custom_new_current = r.message.new_current;
+                                    item_row.custom_asp = r.message.new_current;
                                     item_row.custom_mrp=r.message.mrp;
                                     item_row.custom_box_number = r.message.custom_box_number;
                                     item_row.custom_asin = r.message.custom_asin;
@@ -98,7 +100,7 @@ frappe.ui.form.on('Purchase Invoice', {
                     freeze: true,
                     freeze_message: "loading items...",
                     callback: function (r) {
-                        console.log(r.message, "r.message-------------");
+                        // console.log(r.message, "r.message-------------");
                         if (r.message) {
                             console.log(r.message, "r.message-------------");
                             var item_row = cur_frm.add_child("items");
@@ -205,7 +207,7 @@ frappe.ui.form.on('Purchase Invoice', {
 
 function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     console.log(d,"--------------d")
-    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) / d.custom_new_current) * 100;
+    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) / d.custom_asp) * 100;
     console.log("purchase_price_as_percent_of_online_price",purchase_price_as_percent_of_online_price)
     let discountPercentage = 0;
 
@@ -262,17 +264,16 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     }
     
 
-    let lrpValue = (d.custom_new_current * discountPercentage) / 100;
+    let lrpValue = (d.custom_asp * discountPercentage) / 100;
+    console.log(discountPercentage,"appp")
     console.log("pehle wale lrp",lrpValue)
-    if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
-        let int_lrp = Math.floor(lrpValue);
-        if (int_lrp % 10 === 9) {
-            lrpValue = int_lrp;
-        } else {
-            let stringValue = int_lrp.toString();
-            let modifiedString = stringValue.slice(0, -1) + '9';
-            lrpValue = parseFloat(modifiedString);
-        }
+
+        // Ensure lrpValue is an integer
+        lrpValue = Math.floor(lrpValue);
+        
+        // Adjust lrpValue to end with 9
+        if (lrpValue % 10 !== 9) {
+            lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
     }
     let discount_on_margin=lrpValue-d.rate
     let margin=(discount_on_margin/d.rate*100)
@@ -282,12 +283,7 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
    
     
-    console.log("lrpvalue",lrpValue)
-    console.log("discount_on_margin",discount_on_margin)
-    console.log("percentage",discountPercentage)
-    console.log("margin",margin)
-    console.log("ratings",d.custom_reviewsrating)
-    console.log(d.custom_reviews_count)
+    console.log("lrpvaluenenwewe",lrpValue)
     d.custom_lrp=lrpValue
     d.custom_percentage=discountPercentage
     d.custom_margin=margin
@@ -297,7 +293,7 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
 
 
 
-// ------------------------------print item barcode------------------------
+// ------------------------------print item barcode------------------------calculation for non asin-----------------
 
 frappe.ui.form.on('Purchase Invoice Item', {
     custom_print_barcode(frm,cdt,cdn) {
@@ -413,6 +409,7 @@ frappe.ui.form.on('Purchase Invoice Item', {
     },
 
     custom_percentage: function(frm, cdt, cdn) {
+        console.log("ppppppppppppppppeweww")
         let d = locals[cdt][cdn];
 
         function applyDiscount(discountPercentage, frm, cdt, cdn) {

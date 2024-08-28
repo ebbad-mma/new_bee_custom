@@ -2,15 +2,8 @@ frappe.ui.form.on('Supplier Quotation', {
     custom_search_and_insert_item(frm,cdt,cdn) {
         let purchase =frm.doc.custom_supplier_quotation_item;
             // console.log(purchase[0].custom_box_number)
-            if (purchase[0].custom_box_number || purchase[0].custom_asin){frm.doc.custom_is_asin =1
-                console.log("hehhe,asin")
+            if (purchase[0].custom_box_number || purchase[0].custom_asin || purchase[0].custom_ean){frm.doc.custom_is_asin =1
             }
-            else { 
-                // frm.doc.custom_non_asin =1
-                frm.set_value("custom_non_asin",1)
-            
-            }
-            console.log(frm.doc.custom_non_asin,"non")
 
        if(!frm.doc.supplier){frappe.msgprint('Please select supplier')}
         else if (frm.doc.custom_supplier_quotation_item) {
@@ -18,7 +11,6 @@ frappe.ui.form.on('Supplier Quotation', {
             // cur_frm.doc.insert(ignore_permission=true)
 
             if (frm.doc.custom_is_asin ==1) {
-                console.log("pppppppppppppp")
                 for (let obj of frm.doc.custom_supplier_quotation_item) {
                     frappe.call({
                         method: "luckybee_customization.overrides.supplier_quotation.search_and_insert_item",
@@ -42,11 +34,13 @@ frappe.ui.form.on('Supplier Quotation', {
                             'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
                             "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
                             "custom_synced": obj.custom_synced != null ? obj.custom_synced :"0",
+                            "amount": obj.amount != null ? obj.amount :"0"
                         },
                         freeze: true,
                         freeze_message: "loading items...",
                         callback: function (r) {
                             if (r.message.item_code) {
+                                console.log("r message",r)
                                 var item_row = cur_frm.add_child("items");
                                 item_row.item_code = r.message.item_code;
                                 item_row.item_name = r.message.custom_amzon_item_name;
@@ -65,15 +59,23 @@ frappe.ui.form.on('Supplier Quotation', {
                                 item_row.brand=r.message.brand;
                                 item_row.description=r.message.item_name;
                                 item_row.image_view=r.message.custom_image1
+                                // item_row.conversion_factor=1
                                 calculate_lrp_and_apply_discount(frm,cdt,cdn,item_row)
-                                console.log("checkkkkk",item_row.item_name)
+                                // console.log("checkkkkk",item_row.item_name)
                                 // item_row.rate = r.message.rate;
                                 cur_frm.refresh_fields("items");
-                                cur_frm.save();
+                                if (frm.is_new()) {
+                                    // Set the company currency
+                                    frm.set_value('company','Samyak Resources');
+                                    console.log("save form first tie")
+                                    // Save the form
+                                    frm.save();
+                                }
+                                // cur_frm.save();
                                 for (let item of cur_frm.doc.custom_supplier_quotation_item) {
                                     if (item.description_of_good_and_services === r.message.item_name) {
                                         item.custom_synced =1;
-                                        cur_frm.refresh_fields("items");
+                                        // cur_frm.refresh_fields("items");
                                     }
                                 }
                             }

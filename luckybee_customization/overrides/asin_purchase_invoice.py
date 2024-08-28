@@ -9,7 +9,7 @@ def safe_int(value, default=0):
 		return default
 
 @frappe.whitelist()
-def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc):
+def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc,amount):
 	doc = json.loads(doc)
 
 	dict_itm = {}
@@ -37,14 +37,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				
 				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
 					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
-			# frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
-			# item.opening_stock+=float(qty)
-			# frappe.log_error("before save",f"{item.opening_stock} {item.name}")
 			item.save()
-		# if disc_perc: 
-		# 	rate = float(rate)
-		# 	disc_perc = float(disc_perc)
-		# 	discounted_price = rate - (rate * (disc_perc / 100))
 		int_mrp=float(mrp)
 		if not item_code_exist:
 			item = frappe.new_doc("Item")
@@ -67,6 +60,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
 			item.custom_ean = custom_ean
+			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
 			# item.custon_fsn_no = custom_fsn
 
 			
@@ -124,73 +118,27 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 		mrp = last_price_safe if last_price_safe > 0 else list_price_highest_safe
 		if reviews_count is not None:
 			reviews_count=int(reviews_count)
+		
+		# get item details to calculatelrp 
+		if frappe.db.exists('Item Details',{'item':item.name}):
+			it_det=frappe.get_doc('Item Details',{'item':item.name})
+			avg_30=it_det.list_price_30_days_avg
+			avg_90=it_det.list_price_90_days_avg
+			dict_itm.update({'30_days_avg':avg_30,'90_days_avg':avg_90})
 		dict_itm.update({
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,
 							"qty": qty,
 							"item_name": description,
-							"uom": "Nos",
+							"uom":per,
 							"new_current":float(new_current) if new_current else 0,
 							"custom_asin":custom_asin,
 							"rate":rate,
 							"custom_box_number":custom_box_number,
 							"custom_reviews_count":reviews_count,
 							"last_purchase_rate":last_purchase_rate,
-							"mrp":mrp
+							"mrp":mrp,
+							"amount":float(amount)
 						})
 	return dict_itm
 
-# ---------------------------create item price---------------------------------
-def create_item_price(item, lrp=None, discounted_price=None):
-	if not frappe.db.exists("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"}):
-		item_price = frappe.new_doc("Item Price")
-		item_price.item_code = item.item_code
-		item_price.price_list = "Standard Selling"
-		item_price.selling = 1
-		item_price.item_name = item.item_name
-		item_price.uom = item.stock_uom
-		item_price.valid_from = today()
-		item_price.price_list_rate = lrp
-		item_price.save()
-
-	if not frappe.db.exists("Item Price", {"item_code": item.item_code, "price_list": "Standard Buying"}):
-		item_price = frappe.new_doc("Item Price")
-		item_price.item_code = item.item_code
-		item_price.price_list = "Standard Buying"
-		item_price.buying = 1
-		item_price.item_name = item.item_name
-		item_price.uom = item.stock_uom
-		item_price.valid_from = today()
-		item_price.price_list_rate = discounted_price
-		item_price.save()
-
-	if frappe.db.exists('Item',item.item_code):
-		# -----------------comment for now---------------------
-		ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"})
-		frappe.log_error(f"{ip.price_list_rate}'   '{lrp}")
-		exists = any(d.price_list == 'Standard Selling' for d in item.custom_item_price_details)
-		if not exists:
-			item.append('custom_item_price_details',{'item_code': item.item_code,'uom':ip.uom,'item_price':ip.name,'rate':lrp,'price_list':'Standard Selling'})
-			item.save()
-		if str(ip.price_list_rate) != str(lrp):
-			ip.price_list_rate = lrp
-			ip.save()
-			for ipd in item.custom_item_price_details:
-				if ip.name == ipd.item_price:
-					ipd.rate = lrp
-			item.save()
-
-		ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Buying"})
-		frappe.log_error(f"{ip.price_list_rate}' ppp'{discounted_price}")
-		exists = any(d.price_list == 'Standard Buying' for d in item.custom_item_price_details)
-		if not exists:
-			item.append('custom_item_price_details',{'item_code': item.item_code,'uom':ip.uom,'price_list':'Standard Buying','rate':float(discounted_price),'item_price':ip.name})
-			item.save()
-		if str(ip.price_list_rate) != str(discounted_price):
-			ip.price_list_rate = discounted_price
-			ip.save()
-			for ipd in item.custom_item_price_details:
-				if ip.name == ipd.item_price:
-					ipd.rate = discounted_price
-			item.save()
-		# -----------------comment for now---------------------

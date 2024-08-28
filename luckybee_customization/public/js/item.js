@@ -26,7 +26,7 @@ frappe.ui.form.on('Item', {
                         
                 callback: function(r){
                     cur_frm.refresh()
-                    frm.refresh_fields();
+                    window.location.reload()
                     frappe.msgprint(r.message)
                 }
             })
@@ -41,8 +41,8 @@ frappe.ui.form.on('Item', {
                     },
                     method: "luckybee_customization.woocommerce.publish_item.unpublish_item",
                     callback: function(r){
-                        cur_frm.refresh()
-                        frm.refresh_fields();
+                        
+                        window.location.reload()
                         frappe.msgprint(r.message)
                     }
                 })
