@@ -63,8 +63,7 @@ def publish_item(doc):
             version="wc/v3",
             timeout=1000
     )
-    response = wcapi.get(f"products/7041").json()
-    # frappe.throw(f"{response}")
+
 
     #fetch LRP from item price
     if frappe.db.exists('Item Price',{'item_code':doc['name']}):
