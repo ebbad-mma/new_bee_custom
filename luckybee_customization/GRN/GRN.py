@@ -10,6 +10,7 @@ def get_fields(purchase_invoice):
     res_list= []
     for item in item_table:
         res = item.as_dict()
+        res['total_item']=len(item_table)
         item_doc = frappe.get_doc("Item", item.item_code)
         res["item_code"] = item.item_code
         # description = item.description        

@@ -5,9 +5,11 @@ from frappe.utils import today
 
 
 @frappe.whitelist()
-def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, disc, gst, mrp, lrp, brand, group, category, sub_category):
+def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,disc3, disc, gst, mrp, lrp, brand, group, category, sub_category):
+	frappe.log_error(f"{disc1}-{disc2}-{disc3}-{disc}")
 	doc = json.loads(doc)
 	dict_itm = {}
+
 	if description :
 
 		#create UOM
@@ -17,19 +19,21 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			uom.enabled=1
 			uom.insert()
 		#create Brand
-		if not frappe.db.exists('Brand',{'brand':brand}):
-			br=frappe.new_doc('Brand')
-			br.brand=brand
-			br.insert()
-		#calculate buying price
-		if disc_perc: 
-			rate = float(rate)
-			disc_perc = float(disc_perc)
-			discounted_price = rate - (rate * (disc_perc / 100))
+		if brand:
+			if not frappe.db.exists('Brand',{'brand':brand}):
+				br=frappe.new_doc('Brand')
+				br.brand=brand
+				br.insert()
+		# #calculate buying price
+		# if disc: 
+		# 	rate = float(rate)
+		# 	disc = float(disc)
+		# 	discounted_price = rate - (rate * (disc / 100))
 
 			
 		item_code_exist = frappe.db.exists('Item', {'item_name':description}, 'item_code')
 		if item_code_exist:
+			frappe.log_error("exis")
 			item=frappe.get_doc('Item',{'item_name':description})
 			supplierNrate={'last_supplier':[],"last_rate":[]}
 			if brand=='ASSR':
@@ -58,13 +62,41 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 				item.custom_last_supplier_purchase_rate=float(rate)
 				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
 					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
-			# frappe.log_error("obefore change",f"{item.opening_stock} {item.name}")
-			# item.opening_stock+=float(qty)
-			# frappe.log_error("before save",f"{item.opening_stock} {item.name}")
+			if item.custom_mrp and float(mrp) > 0 and float(item.custom_mrp) != float(mrp) :
+				item.custom_mrp = mrp
+			if item.gst_hsn_code != hsn:
+				item.gst_hsn_code = hsn
+			if item.custom_luckybee_brand != brand:
+				item.custom_luckybee_brand = brand
+			if item.custom_group != group:
+				item.custom_group = group
+			if item.custom_category != category:
+				item.custom_category = category
+			if item.custom_category_sub != sub_category:
+				item.custom_category_sub = sub_category
+			if not item.custom_barcode:
+				item.custom_barcode = item.item_code
+				barcode_row = item.append("barcodes", {})
+				barcode_row.barcode = item.item_code
+			gst = ""
+			disc=str(disc)
+			# if disc_perc:
+			if disc == "15.25":
+				gst = "GST 18% - SR"
+			elif disc == "10.71":
+				gst = "GST 12% - SR"
+			elif disc == "4.71":
+				gst = "GST 5% - SR"
+			item.taxes=[]
+			row = item.append("taxes", {})
+			row.item_tax_template = gst
 			item.save()
+
+			time.sleep(5)
 
 
 		if not item_code_exist:
+			frappe.log_error("new")
 			item = frappe.new_doc("Item")
 			# item.naming_series = 'L.#####'
 			# item.item_code=custom_purchase_item
@@ -100,9 +132,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			item.custom_category = category
 			item.custom_category_sub = sub_category
 
-			
+			disc=str(disc)
 			gst = ""
-			# if disc_perc:
 			# --------------------comment for now-----------------
 			if disc == "15.25":
 				gst = "GST 18% - SR"
@@ -123,38 +154,10 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
 			item.save()
-			# if disc_perc:
+			time.sleep(5)
+			# if disc:
 			# create_item_price(item, lrp, discounted_price)
-		else:
-			item = frappe.get_doc("Item", item_code_exist)
-
-			# if disc_perc:
-			# create_item_price(item, lrp, discounted_price)
-			# frappe.log_error(title="item code ", message = f'item starts with: {(item.item_code).startswith("L1")}, length: { len(item.item_code)} , item:{ item_code_exist}')
-			# frappe.log_error(title="MRP", message = f'item.custom_mrp: {item.custom_mrp}, mrp: {mrp}')
-			if item and (item.item_code).startswith("L1") and len(item.item_code) == 6:
-				if item.custom_mrp and float(mrp) > 0 and float(item.custom_mrp) != float(mrp) :
-					item.custom_mrp = mrp
-				if item.gst_hsn_code != hsn:
-					item.gst_hsn_code = hsn
-				if item.custom_luckybee_brand != brand:
-					item.custom_luckybee_brand = brand
-				if item.custom_group != group:
-					item.custom_group = group
-				if item.custom_category != category:
-					item.custom_category = category
-				if item.custom_sub_category != sub_category:
-					item.custom_sub_category = sub_category
-				if not item.custom_barcode:
-					item.custom_barcode = item.item_code
-					barcode_row = item.append("barcodes", {})
-					barcode_row.barcode = item.item_code
-				item.save()
-
-				time.sleep(5)
-		# if disc_perc:
-			# dict_itm.update({"item_code": frappe.db.get_value("Item", {"item_name": description}, 'item_code'),
-			# 				"qty": qty, "item_name": description, "uom": "Nos", "rate": discounted_price, "amount": int(qty)*float(discounted_price)})
+		
 		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','last_purchase_rate'])
 		dict_itm.update({
 							"item_code": item_code,
@@ -162,11 +165,17 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc_perc, dis
 							"qty": qty,
 							"item_name": description,
 							"uom": per,
-							"rate": discounted_price,
-							"amount": int(qty)*float(discounted_price),
+							"rate": rate,
+							"amount": int(qty)*float(rate),
 							"last_purchase_rate":last_purchase_rate,
 							"last_purchase_rate":last_purchase_rate,
-							"custom_mrp":mrp
+							"custom_mrp":mrp,
+							"gst_disc":disc,
+							"disc1":disc1,
+							"disc2":disc2,
+							"disc3":disc3,
+							"gst_template":gst
 						})
+		frappe.log_error("dict",dict_itm)
 		return dict_itm
 

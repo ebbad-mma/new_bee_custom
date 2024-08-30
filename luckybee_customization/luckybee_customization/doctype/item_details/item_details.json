@@ -10,6 +10,10 @@
   "itemtab_tab",
   "item",
   "column_break_en0by",
+  "go_to_item_section",
+  "amazon_item_url",
+  "column_break_o6kbn",
+  "flipkart_item_url",
   "amazon_section",
   "asin_no",
   "column_break_1zxqb",
@@ -509,11 +513,32 @@
    "fieldname": "flipkart_dis_per",
    "fieldtype": "Percent",
    "label": "Flipkart Dis%"
+  },
+  {
+   "fieldname": "go_to_item_section",
+   "fieldtype": "Section Break",
+   "label": "Go to Item"
+  },
+  {
+   "fieldname": "amazon_item_url",
+   "fieldtype": "Data",
+   "label": "Amazon Item URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_o6kbn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "flipkart_item_url",
+   "fieldtype": "Data",
+   "label": "Flipkart Item URL",
+   "options": "URL"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-22 18:19:06.824546",
+ "modified": "2024-08-30 16:47:29.983945",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Item Details",

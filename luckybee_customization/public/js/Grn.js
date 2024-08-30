@@ -28,7 +28,7 @@ frappe.ui.form.on('Goods Received Note - GRN', {
 	                frm.doc.purchase = "Asin"
 	                frm.doc.mrp = elem['mrp'];
 	            }
-	            
+	            frm.doc.custom_total_items_in_invoice=elem['total_item']
 	            frm.doc.product = elem['item_code'];
 	            frm.doc.custom_box_number = elem['custom_box_number'];
 	            frm.doc.custom_asin_number = elem['custom_asin'];

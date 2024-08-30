@@ -38,6 +38,9 @@ frappe.ui.form.on('Purchase Invoice', {
                                 'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
                                 "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
                                 "disc": obj.disc != null ? flt(obj.disc) : 0,
+                                'disc1': obj.disc_ != null ? flt(obj.disc_) : 0,
+                                'disc2': obj.disc2 != null ? flt(obj.disc2) : 0,
+                                'disc3': obj.disc3 != null ? flt(obj.disc3) : 0,
                                 "amount": obj.amount != null ? flt(obj.amount) : 0
 
                             },
@@ -57,10 +60,17 @@ frappe.ui.form.on('Purchase Invoice', {
                                     item_row.custom_reviews_count = r.message.custom_reviews_count;
                                     item_row.custom_last_purchase_rate=r.message.last_purchase_rate
                                     item_row.custom_asp = r.message.new_current;
+                                    item_row.custom_avg_30 = r.message.avg_30;
+                                    item_row.custom_avg_90 = r.message.avg_90;
                                     item_row.custom_mrp=r.message.mrp;
                                     item_row.custom_box_number = r.message.custom_box_number;
                                     item_row.custom_asin = r.message.custom_asin;
                                     item_row.custom_ppmumrpdap='PASP'
+                                    item_row.custom_disc_=flt(r.message.disc1);
+                                    item_row.custom_disc2=flt(r.message.disc2);
+                                    item_row.custom_disc3=flt(r.message.disc3);
+                                    item_row.custom_disc=r.message.gst_disc;
+                                    item_row.item_tax_template=r.message.gst_template;                                    ;
                                     calculate_lrp_and_apply_discount(frm,cdt,cdn,item_row)
     
                                     // item_row.rate = r.message.rate;
@@ -132,7 +142,9 @@ frappe.ui.form.on('Purchase Invoice', {
                             'qty': obj.quantity != null ? obj.quantity : 0,
                             'rate': obj.rate != null ? obj.rate : 0,
                             'per': obj.per != null ? obj.per : 0,
-                            'disc_perc': obj.disc_ != null ? flt(obj.disc_) : 0,
+                            'disc1': obj.disc_ != null ? flt(obj.disc_) : 0,
+                            'disc2': obj.disc2 != null ? flt(obj.disc2) : 0,
+                            'disc3': obj.disc3 != null ? flt(obj.disc3) : 0,
                             'disc': obj.disc != null ? flt(obj.disc) : 0,
                             'gst': obj.gst != null ? obj.gst : "",
                             'mrp': obj.mrp != null ? obj.mrp : 0,
@@ -147,6 +159,10 @@ frappe.ui.form.on('Purchase Invoice', {
                         callback: function (r) {
                             console.log(r.message, "r.message-------------");
                             if (r.message) {
+                                console.log("custsttsts0",r.message.custom_mrp)
+                                let cu_mrp=0
+                                if (r.message.custom_mrp){if(r.message.custom_mrp<=0){cu_mrp= r.message.rate}}
+                                console.log('[cu mrp]',cu_mrp)
                                 console.log(r.message, "r.message-------------");
                                 var item_row = cur_frm.add_child("items");
                                 item_row.item_code = r.message.item_code;
@@ -156,11 +172,16 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.rate = r.message.rate;
                                 item_row.amount = r.message.amount;
                                 item_row.custom_last_purchase_rate=r.message.last_purchase_rate;
-                                item_row.custom_mrp=r.message.custom_mrp;
+                                item_row.custom_mrp=cu_mrp;
+                                item_row.custom_disc_=flt(r.message.disc1);
+                                item_row.custom_disc2=flt(r.message.disc2);
+                                item_row.custom_disc3=flt(r.message.disc3);
+                                item_row.custom_disc=r.message.gst_disc;
+                                item_row.item_tax_template=r.message.gst_template; 
 
                                 cur_frm.refresh_fields("items");
                                 for (let item of frm.doc.custom_custom_purchase_item) {
-                                    console.log("ppppppppppppppppppppppppppppppppp",item.description_of_good_and_services ,r.message.item_name)
+                                    // console.log("ppppppppppppppppppppppppppppppppp",item.description_of_good_and_services ,r.message.item_name)
                                     if (item.description_of_good_and_services === r.message.item_name) {
                                         item.custom_synced =1;
                                         // cur_frm.refresh_fields("custom_custom_purchase_item");
@@ -207,7 +228,21 @@ frappe.ui.form.on('Purchase Invoice', {
 
 function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     console.log(d,"--------------d")
-    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) / d.custom_asp) * 100;
+    let result=0;
+    console.log("Result",result)
+    console.log("custom_asp",d.custom_asp)
+    console.log("custom_avg_30",d.custom_avg_30)
+    console.log("custom_avg_90",d.custom_avg_90)
+    if (d.custom_asp > 0) {
+        result = d.custom_asp;
+    } else if(d.custom_avg_30 > 0){
+        result = d.custom_avg_30 ;
+    }
+    else if(d.custom_avg_90>0){result = d.custom_avg_90 ;}
+    else{result=0}
+    console.log("final Result",result)
+    if(result>0){
+    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) /result) * 100;
     console.log("purchase_price_as_percent_of_online_price",purchase_price_as_percent_of_online_price)
     let discountPercentage = 0;
 
@@ -242,6 +277,7 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
         }
     } 
     else if(d.custom_reviews_count <=50){
+        console.log("hhhahahhhahahahahahhahahah")
         if (purchase_price_as_percent_of_online_price > 5 && purchase_price_as_percent_of_online_price <= 20) {
             discountPercentage = 55;
         } else if (purchase_price_as_percent_of_online_price > 20 && purchase_price_as_percent_of_online_price <= 30) {
@@ -264,7 +300,7 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     }
     
 
-    let lrpValue = (d.custom_asp * discountPercentage) / 100;
+    let lrpValue = (result * discountPercentage) / 100;
     console.log(discountPercentage,"appp")
     console.log("pehle wale lrp",lrpValue)
 
@@ -277,18 +313,22 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     }
     let discount_on_margin=lrpValue-d.rate
     let margin=(discount_on_margin/d.rate*100)
-    let discount_on_mrp = d.custom_mrp - lrpValue;
-    let dis = (discount_on_mrp * 100) / d.custom_mrp;
+    let discount_on_mrp = result - lrpValue;
+    let dis = (discount_on_mrp * 100) / result;
     let custom_discount = Math.round(dis / 10) * 10;
-    frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
+    // frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
    
     
     console.log("lrpvaluenenwewe",lrpValue)
+   
     d.custom_lrp=lrpValue
     d.custom_percentage=discountPercentage
     d.custom_margin=margin
     d.custom_discount=custom_discount
-}
+
+    // Refresh the field if necessary
+    frm.refresh_field('items');
+}}
 
 
 
@@ -296,6 +336,13 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
 // ------------------------------print item barcode------------------------calculation for non asin-----------------
 
 frappe.ui.form.on('Purchase Invoice Item', {
+
+    // #for amazom lrp calculate based on asp
+    custom_asp(frm,cdt,cdn){
+        var d = locals[cdt][cdn];
+        calculate_lrp_and_apply_discount(frm, cdt, cdn, d)
+    }
+        ,
     custom_print_barcode(frm,cdt,cdn) {
 		// your code here
 		var d = locals[cdt][cdn];
@@ -322,14 +369,15 @@ frappe.ui.form.on('Purchase Invoice Item', {
             } else {
                 let custom_percentage = (d.custom_percentage / 100) * d.rate;
                 let lrpValue = custom_percentage + d.rate;
-        
+                console.log('lrp value before conevrtin ppmu',lrpValue)
                 // Ensure lrpValue is an integer
                 lrpValue = Math.floor(lrpValue);
-        
+                
                 // Adjust lrpValue to end with 9
                 if (lrpValue % 10 !== 9) {
                     lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
                 }
+                console.log('lrp value afeter conevrtin ppmu',lrpValue)
         
                 let discount_on_mrp = d.custom_mrp - lrpValue;
                 let dis = (discount_on_mrp * 100) / d.custom_mrp;
@@ -337,6 +385,7 @@ frappe.ui.form.on('Purchase Invoice Item', {
         
                 // If the discount is less than 15%, adjust the LRP to give a 15% discount
                 if (custom_discount < 15) {
+                    console.log("less than 15")
                     lrpValue = Math.floor(d.custom_mrp * 0.85);
         
                     // Adjust lrpValue to end with 9
@@ -353,7 +402,7 @@ frappe.ui.form.on('Purchase Invoice Item', {
                 // Calculate margin
                 let discount_on_margin = lrpValue - d.rate;
                 let margin = (discount_on_margin / d.rate) * 100;
-        
+                console.log("lllll",lrpValue)
                 frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
                 frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
                 frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
@@ -407,38 +456,41 @@ frappe.ui.form.on('Purchase Invoice Item', {
         }
         
     },
+    // ------------------------comment for now---------------------
 
-    custom_percentage: function(frm, cdt, cdn) {
-        console.log("ppppppppppppppppeweww")
-        let d = locals[cdt][cdn];
+    // custom_percentage: function(frm, cdt, cdn) {
+    //     let d = locals[cdt][cdn];
+    // if(d.custom_ppmumrpdap=='PPMU' || d.custom_ppmumrpdap=='MRPD'){
 
-        function applyDiscount(discountPercentage, frm, cdt, cdn) {
-            let lrpValue = (d.custom_new_current * discountPercentage) / 100;
-             if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
-            let int_lrp = Math.floor(lrpValue);
-            if (int_lrp % 10 === 9) {
-                lrpValue = int_lrp;
-            } else {
-                let stringValue = int_lrp.toString();
-                let modifiedString = stringValue.slice(0, -1) + '9';
-                lrpValue = parseFloat(modifiedString);
-            }
-        }
-            let discount_on_margin = lrpValue - d.rate;
-            let margin = (discount_on_margin / d.rate * 100);
-            let discount_on_mrp = d.custom_mrp - lrpValue;
-            let dis = (discount_on_mrp * 100) / d.custom_mrp;
-            let custom_discount = Math.round(dis / 10) * 10;
-            frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
+    //     function applyDiscount(discountPercentage, frm, cdt, cdn) {
+    //         let lrpValue = (d.custom_new_current * discountPercentage) / 100;
+    //          if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
+    //         let int_lrp = Math.floor(lrpValue);
+    //         if (int_lrp % 10 === 9) {
+    //             lrpValue = int_lrp;
+    //         } else {
+    //             let stringValue = int_lrp.toString();
+    //             let modifiedString = stringValue.slice(0, -1) + '9';
+    //             lrpValue = parseFloat(modifiedString);
+    //         }
+    //     }
+    //         let discount_on_margin = lrpValue - d.rate;
+    //         let margin = (discount_on_margin / d.rate * 100);
+    //         let discount_on_mrp = d.custom_mrp - lrpValue;
+    //         let dis = (discount_on_mrp * 100) / d.custom_mrp;
+    //         let custom_discount = Math.round(dis / 10) * 10;
+    //         frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
            
-            frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
-            frappe.model.set_value(cdt, cdn, 'custom_percentage', discountPercentage);
-            frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
-        }
+    //         frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
+    //         frappe.model.set_value(cdt, cdn, 'custom_percentage', discountPercentage);
+    //         frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
+    //     }}
 
-        if (d.custom_ppmumrpdap === 'PASP') {
-            applyDiscount(d.custom_percentage, frm, cdt, cdn);
-        }}
+    //     if (d.custom_ppmumrpdap === 'PASP') {
+    //         applyDiscount(d.custom_percentage, frm, cdt, cdn);
+    //     }}
+
+    // ------------------------comment for now-----------------------
 })
 
 

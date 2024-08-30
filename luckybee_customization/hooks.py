@@ -144,13 +144,13 @@ scheduler_events = {
     "0 */2 * * *": [
         "luckybee_customization.woocommerce.update_webhook_status.update_webhook_status_by_scheduler"
     ]
-}
+},
 # 	"daily": [
 # 		"luckybee_customization.tasks.daily"
 # 	],
-# 	"hourly": [
-# 		"luckybee_customization.tasks.hourly"
-# 	],
+	"hourly": [
+		"luckybee_customization.overrides.item_utils.update_item_in_woocom"
+	]
 # 	"weekly": [
 # 		"luckybee_customization.tasks.weekly"
 # 	],

@@ -24,7 +24,7 @@ def scrape(fsn):
 	categories = [div.text for div in soup.find_all('div',class_='r2CdBx')[1:-1]]
 
 	rating = soup.find('div', class_='XQDdHH').text
-	price = soup.find('div', class_='Nx9bqj CxhGGd').text
+	# price = soup.find('div', class_='Nx9bqj CxhGGd').text------------->comment by me
 	seller = soup.find('div', class_='yeLeBC').text
 	seller_rating = soup.find('div', class_='XQDdHH uuhqql').text
 	main_image_div = soup.find('div', class_='_4WELSP _6lpKCl')
@@ -104,7 +104,7 @@ def scrape(fsn):
 		"title" : title,
 		'categories': categories,
 		"rating" : rating,
-		"price" : price,
+		"price" : 0,
 		"seller" : seller,
 		"image_url":  main_image,
 		"multiple_images" : image_src,

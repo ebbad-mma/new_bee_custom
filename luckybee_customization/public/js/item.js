@@ -23,6 +23,8 @@ frappe.ui.form.on('Item', {
                     doc : frm.doc
                 },
                 method: "luckybee_customization.woocommerce.publish_item.publish_item",
+                freeze: true,
+                freeze_message: "Publishing item...",
                         
                 callback: function(r){
                     cur_frm.refresh()
