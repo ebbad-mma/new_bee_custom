@@ -404,7 +404,7 @@ def sync_keepa_item(doc, event):
 					category_tree = []
 					category_tree_dict = {}
 					if products[i].get('categoryTree'):
-						category_tree = [i.get("name") for i in products[i].get('categoryTree')]
+						category_tree = [i.get(	"name") for i in products[i].get('categoryTree')]
 						category_tree_dict = {i["catId"]:i["name"] for i in products[i]['categoryTree']}
 
 					if category_tree:
@@ -705,9 +705,11 @@ def sync_keepa_item(doc, event):
 			fsn = doc.custom_fsn_no
 
 		doc.custom_fsn_no = fsn
+		frappe.log_error("FSN",fsn)
 		data = scrape(fsn)
+		frappe.log_error("FSN DATA",data)
 
-		doc.item_name = data['title']
+		doc.item_name = data['title'][0:130]
 		doc.description = data['description']
 		item_detail.set('item_groups', [])
 
