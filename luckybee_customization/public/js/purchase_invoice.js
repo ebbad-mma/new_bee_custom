@@ -160,6 +160,7 @@ frappe.ui.form.on('Purchase Invoice', {
                             console.log(r.message, "r.message-------------");
                             if (r.message) {
                                 console.log("custsttsts0",r.message.custom_mrp)
+                                let pp_after_disc=pp_after_disc(rate, disc1, disc2, disc3)
                                 let cu_mrp=0
                                 if (r.message.custom_mrp){if(r.message.custom_mrp<=0){cu_mrp= r.message.rate}}
                                 console.log('[cu mrp]',cu_mrp)
@@ -169,7 +170,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.item_name = r.message.item_name;
                                 item_row.qty = r.message.qty;
                                 item_row.uom = r.message.uom;
-                                item_row.rate = r.message.rate;
+                                item_row.rate = pp_after_disc;
                                 item_row.amount = r.message.amount;
                                 item_row.custom_last_purchase_rate=r.message.last_purchase_rate;
                                 item_row.custom_mrp=cu_mrp;
@@ -527,3 +528,27 @@ frappe.ui.form.on('Purchase Invoice', {
         frm.refresh_field('items');
     }
 });
+
+
+// ----------------------calculate purchase price after discount----------------
+function pp_after_disc(rate, disc1, disc2, disc3) {
+    // Convert the rate to a number
+    let finalRate = parseFloat(rate);
+
+    // Check and apply the first discount if available
+    if (disc1) {
+        finalRate -= finalRate * (disc1 / 100);
+    }
+
+    // Check and apply the second discount if available
+    if (disc2) {
+        finalRate -= finalRate * (disc2 / 100);
+    }
+
+    // Check and apply the third discount if available
+    if (disc3) {
+        finalRate -= finalRate * (disc3 / 100);
+    }
+
+    return finalRate.toFixed(2); // Return the final rate rounded to two decimal places
+}
