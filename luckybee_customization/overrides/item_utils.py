@@ -13,19 +13,19 @@ def check_image(doc,method=None):
     #             doc.db_set('custom_image1',i.image)
     #create item details
     if doc.custom_asin_no:
-        item=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
-        item.amazon_item_url=f"https://www.amazon.in/dp/{doc.custom_asin_no}"
-        item.item=doc.name
-        item.save()
+        item_details=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
+        item_details.amazon_item_url=f"https://www.amazon.in/dp/{doc.custom_asin_no}"
+        item_details.item=doc.name
+        item_details.save()
     elif doc.custom_ean:
-        item=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
-        item.item=doc.name
-        item.save()
+        item_details=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
+        item_details.item=doc.name
+        item_details.save()
     elif doc.custom_fsn_no:
-        item=frappe.get_doc('Item Details',{'fsn_no':doc.custom_fsn_no})
-        item.flipkart_item_url=f"https://www.flipkart.com/product/p/itme?pid={doc.custom_fsn_no}"
-        item.item=doc.name
-        item.save()
+        item_details=frappe.get_doc('Item Details',{'fsn_no':doc.custom_fsn_no})
+        item_details.flipkart_item_url=f"https://www.flipkart.com/product/p/itme?pid={doc.custom_fsn_no}"
+        item_details.item=doc.name
+        item_details.save()
     else:
         pass
 

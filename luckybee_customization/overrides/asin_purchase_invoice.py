@@ -128,7 +128,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			it_det=frappe.get_doc('Item Details',{'item':item.name})
 			avg_30=it_det.list_price_30_days_avg
 			avg_90=it_det.list_price_90_days_avg
-			dict_itm.update({'30_days_avg':avg_30,'90_days_avg':avg_90})
+			# dict_itm.update({'30_days_avg':avg_30,'90_days_avg':avg_90})
 		dict_itm.update({
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,

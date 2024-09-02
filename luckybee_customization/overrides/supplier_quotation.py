@@ -5,7 +5,7 @@ from frappe.utils import today
 
 
 @frappe.whitelist()
-def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number,custom_ean,custom_synced,amount):
+def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,disc3, disc, mrp, brand, group, category, sub_category,custom_asin,custom_box_number,custom_ean,custom_synced,amount):
 	doc = json.loads(doc)
 	custom_synced=int(custom_synced)
 	dict_itm = {}
@@ -64,11 +64,16 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 			item.save()
 			time.sleep(5)				
 		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest,brand,custom_image1,custom_amzon_item_name=frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest','brand','custom_image1','custom_amzon_item_name'])
+		# get item details to calculatelrp 
+		if frappe.db.exists('Item Details',{'item':item.name}):
+			it_det=frappe.get_doc('Item Details',{'item':item.name})
+			avg_30=it_det.list_price_30_days_avg
+			avg_90=it_det.list_price_90_days_avg
 		# Convert to integers if possible, otherwise set to 0
 		last_price_int = int(last_price) if last_price is not None and int(last_price) > 0 else 0
 		list_price_highest_int = int(list_price_highest) if list_price_highest is not None and int(list_price_highest) > 0 else 0
 		# Determine mrp based on the above logic
-		mrp = last_price_int if last_price_int > 0 else list_price_highest_int
+		# mrp = last_price_int if last_price_int > 0 else list_price_highest_int
 		# if len(custom_amzon_item_name)>140:
 		# custom_amzon_item_name=custom_amzon_item_name[0:140]
 		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
@@ -79,6 +84,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 							"item_name": description,
 							"uom": "Nos",
 							"new_current":float(new_current) if new_current else 0,
+							"avg_30":float(avg_30) if avg_30 else 0,
+							"avg_90":float(avg_90) if avg_90 else 0,
 							"custom_asin":custom_asin,
 							"rate":rate,
 							"custom_box_number":custom_box_number,
@@ -89,7 +96,11 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, mrp, lrp, bran
 							"custom_image1":custom_image1,
 							"custom_amzon_item_name":custom_amzon_item_name,
 							"amount":float(amount),
-							"uom":per
+							"uom":per,
+							"gst_disc":disc,
+							"disc1":disc1,
+							"disc2":disc2,
+							"disc3":disc3
 						})
 	else:
 		dict_itm.update({})

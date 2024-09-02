@@ -21,11 +21,11 @@ frappe.ui.form.on('Supplier Quotation', {
                             'qty': obj.quantity != null ? obj.quantity : 0,
                             'rate': obj.rate != null ? obj.rate : 0,
                             'per': obj.per != null ? obj.per : "",
-                            // 'disc_perc': obj.disc_ != null ? obj.disc_ : "",
-                            // 'disc': obj.disc != null ? obj.disc : "",
-                            // 'gst': obj.gst != null ? obj.gst : "",
+                            'disc1': obj.disc_ != null ? flt(obj.disc_) : 0,
+                            'disc2': obj.disc2 != null ? flt(obj.disc2) : 0,
+                            'disc3': obj.disc3 != null ? flt(obj.disc3) : 0,
+                            'disc': obj.disc != null ? flt(obj.disc) : 0,
                             'mrp': obj.mrp != null ? obj.mrp : "",
-                            'lrp': obj.lrp != null ? obj.lrp : "",
                             'brand': obj.brand != null ? obj.brand : "",
                             'group': obj.group != null ? obj.group : "",
                             'category': obj.category != null ? obj.category : "",
@@ -40,19 +40,32 @@ frappe.ui.form.on('Supplier Quotation', {
                         freeze_message: "loading items...",
                         callback: function (r) {
                             if (r.message.item_code) {
+                                console.log("custsttsts0",r.message.custom_mrp)
+                                let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
+                                console.log("dissdsdd",pp_after_disc_cal)
+                                let cu_mrp=0
+                                if (r.message.mrp){if(r.message.mrp<=0){cu_mrp=pp_after_disc_cal}else{cu_mrp= r.message.mrp}}
+                                console.log('[cu mrp]',cu_mrp)
                                 console.log("r message",r)
                                 var item_row = cur_frm.add_child("items");
                                 item_row.item_code = r.message.item_code;
                                 item_row.item_name = r.message.custom_amzon_item_name;
                                 item_row.qty = r.message.qty;
                                 item_row.uom = r.message.uom;
-                                item_row.rate = r.message.rate;
+                                item_row.rate = pp_after_disc_cal;
                                 item_row.amount = r.message.amount;
                                 item_row.custom_reviewsrating = r.message.reviews_rating;
                                 item_row.custom_reviews_count = r.message.custom_reviews_count;
                                 item_row.custom_last_purchase_rate=r.message.last_purchase_rate
                                 item_row.custom_new_current = r.message.new_current;
-                                item_row.custom_mrp=r.message.mrp;
+                                item_row.custom_avg_30 = r.message.avg_30;
+                                item_row.custom_avg_90 = r.message.avg_90;
+                                item_row.custom_mrp=cu_mrp;
+                                item_row.custom_disc_=flt(r.message.disc1);
+                                item_row.custom_disc2=flt(r.message.disc2);
+                                item_row.custom_disc3=flt(r.message.disc3);
+                                item_row.custom_disc=r.message.gst_disc;
+                                // item_row.item_tax_template=r.message.gst_template;
                                 item_row.custom_box_number = r.message.custom_box_number;
                                 item_row.custom_asin = r.message.custom_asin;
                                 item_row.custom_ppmumrpdap='PASP';
@@ -140,9 +153,25 @@ frappe.ui.form.on('Supplier Quotation', {
 
 
 
+// ------------for amazon price rule-----------------------
+
 function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     console.log(d,"--------------d")
-    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) / d.custom_new_current) * 100;
+    let result=0;
+    // console.log("Result",result)
+    // console.log("custom_asp",d.custom_asp)
+    // console.log("custom_avg_30",d.custom_avg_30)
+    // console.log("custom_avg_90",d.custom_avg_90)
+    if (d.custom_new_current > 0) {
+        result = d.custom_new_current;
+    } else if(d.custom_avg_30 > 0){
+        result = d.custom_avg_30 ;
+    }
+    else if(d.custom_avg_90>0){result = d.custom_avg_90 ;}
+    else{result=0}
+    console.log("final Result",result)
+    if(result>0){
+    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) /result) * 100;
     console.log("purchase_price_as_percent_of_online_price",purchase_price_as_percent_of_online_price)
     let discountPercentage = 0;
 
@@ -177,6 +206,7 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
         }
     } 
     else if(d.custom_reviews_count <=50){
+        console.log("hhhahahhhahahahahahhahahah")
         if (purchase_price_as_percent_of_online_price > 5 && purchase_price_as_percent_of_online_price <= 20) {
             discountPercentage = 55;
         } else if (purchase_price_as_percent_of_online_price > 20 && purchase_price_as_percent_of_online_price <= 30) {
@@ -199,36 +229,36 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     }
     
 
-    let lrpValue = (d.custom_new_current * discountPercentage) / 100;
+    let lrpValue = (result * discountPercentage) / 100;
+    console.log(discountPercentage,"appp")
     console.log("pehle wale lrp",lrpValue)
-    if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
-        let int_lrp = Math.floor(lrpValue);
-        if (int_lrp % 10 === 9) {
-            lrpValue = int_lrp;
-        } else {
-            let stringValue = int_lrp.toString();
-            let modifiedString = stringValue.slice(0, -1) + '9';
-            lrpValue = parseFloat(modifiedString);
-        }
+
+        // Ensure lrpValue is an integer
+        lrpValue = Math.floor(lrpValue);
+        
+        // Adjust lrpValue to end with 9
+        if (lrpValue % 10 !== 9) {
+            lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
     }
     let discount_on_margin=lrpValue-d.rate
     let margin=(discount_on_margin/d.rate*100)
-    let discount_on_mrp = d.custom_mrp - lrpValue;
-    let dis = (discount_on_mrp * 100) / d.custom_mrp;
+    let discount_on_mrp = result - lrpValue;
+    let dis = (discount_on_mrp * 100) / result;
     let custom_discount = Math.round(dis / 10) * 10;
-    frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
+    // frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
    
     
-    console.log("lrpvalue",lrpValue)
-    console.log("percentage",discountPercentage)
-    console.log("ratings",d.custom_reviewsrating)
-    console.log(d.custom_reviews_count)
+    console.log("lrpvaluenenwewe",lrpValue)
+   
     d.custom_lrp=lrpValue
     d.custom_percentage=discountPercentage
     d.custom_margin=margin
     d.custom_discount=custom_discount
     d.custom_margin_in_amount=discount_on_margin
-}
+
+    // Refresh the field if necessary
+    frm.refresh_field('items');
+}}
 
 
 
@@ -311,21 +341,53 @@ frappe.ui.form.on('Supplier Quotation', {
 
 
 // ----------------------hide delete button globally from decision maker-----------------------
-frappe.ui.form.on('Supplier Quotation', {
-    refresh: function(frm) {
-        frm.set_df_property('custom_decision_maker', 'cannot_delete_rows', true); 
-        frm.set_df_property('custom_decision_maker', 'cannot_add_rows', true); 
-        frm.set_df_property('items', 'cannot_add_rows', true); 
-        frm.set_df_property('items', 'cannot_add_multiple_rows', true); 
+// frappe.ui.form.on('Supplier Quotation', {
+//     refresh: function(frm) {
+//         frm.set_df_property('custom_decision_maker', 'cannot_delete_rows', true); 
+//         frm.set_df_property('custom_decision_maker', 'cannot_add_rows', true); 
+//         frm.set_df_property('items', 'cannot_add_rows', true); 
+//         frm.set_df_property('items', 'cannot_add_multiple_rows', true); 
         
-        setTimeout(function() {
-            // Hide the button that contains "Add Multiple"
-            $("button:contains('Add Multiple')").css("display", "none");
-            $(document).ready(function() {
-                // Hide the second button with the class "grid-upload"
-                $(".grid-upload").eq(1).css("display", "none");
-            });
+//         setTimeout(function() {
+//             // Hide the button that contains "Add Multiple"
+//             $("button:contains('Add Multiple')").css("display", "none");
+//             $(document).ready(function() {
+//                 // Hide the second button with the class "grid-upload"
+//                 $(".grid-upload").eq(1).css("display", "none");
+//             });
             
-        }, 1000); // Adjust the delay as necessary
+//         }, 1000); // Adjust the delay as necessary
+//     }
+// });
+
+
+
+
+// ----------------------calculate purchase price after discount----------------
+
+
+function pp_after_disc(rate, disc1, disc2, disc3) {
+    // Convert the rate to a number
+    let finalRate = parseFloat(rate);
+
+    // Calculate the purchase price by applying all discounts sequentially
+    if (disc1) {
+        finalRate *= (1 - disc1 / 100);
+        console.log("After 1st discount:", finalRate);
+        console.log("1stdisc",disc1)
     }
-});
+
+    if (disc2) {
+        finalRate *= (1 - disc2 / 100);
+        console.log("After 2nd discount:", finalRate);
+        console.log("2nddisc",disc2)
+    }
+
+    if (disc3) {
+        finalRate *= (1 - disc3 / 100);
+        console.log("After 3rd discount:", finalRate);
+        console.log("3rddisc",disc3)
+    }
+
+    return finalRate.toFixed(2); // Return the final rate rounded to two decimal places
+}

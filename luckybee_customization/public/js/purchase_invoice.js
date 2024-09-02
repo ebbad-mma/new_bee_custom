@@ -48,13 +48,16 @@ frappe.ui.form.on('Purchase Invoice', {
                             freeze_message: "loading items...",
                             callback: function (r) {
                                 if (r.message) {
+                                    let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
+                                    let cu_mrp=0
+                                if (r.message.mrp){if(r.message.mrp<=0){cu_mrp=pp_after_disc_cal}else{cu_mrp= r.message.mrp}}
                                     console.log("R MESSAGE",r.message)
                                     var item_row = cur_frm.add_child("items");
                                     item_row.item_code = r.message.item_code;
                                     item_row.item_name = r.message.item_name;
                                     item_row.qty = r.message.qty;
                                     item_row.uom = r.message.uom;
-                                    item_row.rate = r.message.rate;
+                                    item_row.rate =pp_after_disc_cal;
                                     item_row.amount = r.message.amount;
                                     item_row.custom_reviewsrating = r.message.reviews_rating;
                                     item_row.custom_reviews_count = r.message.custom_reviews_count;
@@ -62,7 +65,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                     item_row.custom_asp = r.message.new_current;
                                     item_row.custom_avg_30 = r.message.avg_30;
                                     item_row.custom_avg_90 = r.message.avg_90;
-                                    item_row.custom_mrp=r.message.mrp;
+                                    item_row.custom_mrp=cu_mrp;
                                     item_row.custom_box_number = r.message.custom_box_number;
                                     item_row.custom_asin = r.message.custom_asin;
                                     item_row.custom_ppmumrpdap='PASP'
@@ -160,9 +163,9 @@ frappe.ui.form.on('Purchase Invoice', {
                             console.log(r.message, "r.message-------------");
                             if (r.message) {
                                 console.log("custsttsts0",r.message.custom_mrp)
-                                let pp_after_disc=pp_after_disc(rate, disc1, disc2, disc3)
+                                let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                 let cu_mrp=0
-                                if (r.message.custom_mrp){if(r.message.custom_mrp<=0){cu_mrp= r.message.rate}}
+                                if (r.message.custom_mrp){if(r.message.custom_mrp<=0){cu_mrp=pp_after_disc_cal}else{cu_mrp= r.message.custom_mrp}}
                                 console.log('[cu mrp]',cu_mrp)
                                 console.log(r.message, "r.message-------------");
                                 var item_row = cur_frm.add_child("items");
@@ -170,7 +173,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.item_name = r.message.item_name;
                                 item_row.qty = r.message.qty;
                                 item_row.uom = r.message.uom;
-                                item_row.rate = pp_after_disc;
+                                item_row.rate = pp_after_disc_cal;
                                 item_row.amount = r.message.amount;
                                 item_row.custom_last_purchase_rate=r.message.last_purchase_rate;
                                 item_row.custom_mrp=cu_mrp;
@@ -531,23 +534,29 @@ frappe.ui.form.on('Purchase Invoice', {
 
 
 // ----------------------calculate purchase price after discount----------------
+
+
 function pp_after_disc(rate, disc1, disc2, disc3) {
     // Convert the rate to a number
     let finalRate = parseFloat(rate);
 
-    // Check and apply the first discount if available
+    // Calculate the purchase price by applying all discounts sequentially
     if (disc1) {
-        finalRate -= finalRate * (disc1 / 100);
+        finalRate *= (1 - disc1 / 100);
+        console.log("After 1st discount:", finalRate);
+        console.log("1stdisc",disc1)
     }
 
-    // Check and apply the second discount if available
     if (disc2) {
-        finalRate -= finalRate * (disc2 / 100);
+        finalRate *= (1 - disc2 / 100);
+        console.log("After 2nd discount:", finalRate);
+        console.log("2nddisc",disc2)
     }
 
-    // Check and apply the third discount if available
     if (disc3) {
-        finalRate -= finalRate * (disc3 / 100);
+        finalRate *= (1 - disc3 / 100);
+        console.log("After 3rd discount:", finalRate);
+        console.log("3rddisc",disc3)
     }
 
     return finalRate.toFixed(2); // Return the final rate rounded to two decimal places
