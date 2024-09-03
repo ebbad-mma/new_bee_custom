@@ -371,8 +371,8 @@ frappe.ui.form.on('Purchase Invoice Item', {
                 frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap', '');
                 frappe.throw("Please first apply percentage for item");
             } else {
-                let custom_percentage = (d.custom_percentage / 100) * d.rate;
-                let lrpValue = custom_percentage + d.rate;
+                // let custom_percentage = (d.custom_percentage / 100) * d.rate;------now
+                let lrpValue = d.custom_percentage + d.rate;
                 console.log('lrp value before conevrtin ppmu',lrpValue)
                 // Ensure lrpValue is an integer
                 lrpValue = Math.floor(lrpValue);
@@ -388,6 +388,7 @@ frappe.ui.form.on('Purchase Invoice Item', {
                 let custom_discount = Math.round(dis);
         
                 // If the discount is less than 15%, adjust the LRP to give a 15% discount
+                console.log("custom_di",custom_discount)
                 if (custom_discount < 15) {
                     console.log("less than 15")
                     lrpValue = Math.floor(d.custom_mrp * 0.85);
@@ -401,15 +402,16 @@ frappe.ui.form.on('Purchase Invoice Item', {
                     discount_on_mrp = d.custom_mrp - lrpValue;
                     dis = (discount_on_mrp * 100) / d.custom_mrp;
                     custom_discount = Math.round(dis);
+                console.log("custom_diafte",custom_discount)
+
                 }
         
                 // Calculate margin
-                let discount_on_margin = lrpValue - d.rate;
-                let margin = (discount_on_margin / d.rate) * 100;
-                console.log("lllll",lrpValue)
+                // let discount_on_margin = lrpValue - d.rate;------------------------->now
+                // let margin = (discount_on_margin / d.rate) * 100;------------------->now
                 frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
                 frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
-                frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
+                frappe.model.set_value(cdt, cdn, 'custom_margin', d.custom_percentage);
             }
         }
         

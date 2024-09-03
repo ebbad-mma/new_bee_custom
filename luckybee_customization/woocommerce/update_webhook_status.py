@@ -2,6 +2,7 @@ import frappe
 from luckybee_customization.woocommerce.publish_item import get_woocommerce_settings
 from frappe.utils import cint
 from woocommerce import API
+# Erp@123#456
 
 
 def update_webhook_status():
@@ -60,8 +61,9 @@ def update_webhook_status_by_scheduler():
     }
 
     # Example: Update a specific webhook (change '7' to your desired webhook ID)
-    webhook_id = 7
+    webhook_id = 8
     response = wcapi.get(f"webhooks/{webhook_id}").json()
+    frappe.throw(f"{response}")
     before_change=response
     if response:
         status=response['status']
