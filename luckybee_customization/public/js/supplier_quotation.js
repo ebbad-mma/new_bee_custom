@@ -25,7 +25,7 @@ frappe.ui.form.on('Supplier Quotation', {
                             'disc2': obj.disc2 != null ? flt(obj.disc2) : 0,
                             'disc3': obj.disc3 != null ? flt(obj.disc3) : 0,
                             'disc': obj.disc != null ? flt(obj.disc) : 0,
-                            'mrp': obj.mrp != null ? obj.mrp : "",
+                            'mrp': obj.mrp != null ? obj.mrp :0,
                             'brand': obj.brand != null ? obj.brand : "",
                             'group': obj.group != null ? obj.group : "",
                             'category': obj.category != null ? obj.category : "",
@@ -44,7 +44,21 @@ frappe.ui.form.on('Supplier Quotation', {
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                 console.log("dissdsdd",pp_after_disc_cal)
                                 let cu_mrp=0
-                                if (r.message.mrp){if(r.message.mrp<=0){cu_mrp=pp_after_disc_cal}else{cu_mrp= r.message.mrp}}
+                                if (r.message.mrp) {
+                                    if (r.message.mrp > 0) {
+                                        cu_mrp = r.message.mrp;
+                                    } else {
+                                        if (pp_after_disc_cal <= 0) {
+                                            cu_mrp = r.message.rate;
+                                        }
+                                        if (pp_after_disc_cal > 0) {
+                                            cu_mrp = pp_after_disc_cal;
+                                        }
+                                    }
+                                
+                                    
+                                }
+                                
                                 console.log('[cu mrp]',cu_mrp)
                                 console.log("r message",r)
                                 var item_row = cur_frm.add_child("items");

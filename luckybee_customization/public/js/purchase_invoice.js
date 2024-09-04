@@ -1,7 +1,7 @@
 frappe.ui.form.on('Purchase Invoice', {
     custom_search_and_insert_item(frm,cdt,cdn) {
         let purchase =frm.doc.custom_custom_purchase_item;
-            if (purchase[0].custom_box_number || purchase[0].custom_asin || purchase[0].custom_ean){frm.set_value('custom_is_asin',1)}
+            if (purchase[0].custom_asin || purchase[0].custom_ean){frm.set_value('custom_is_asin',1)}
             else if (purchase[0].custom_fsn){frm.set_value('custom_is_fsn',1)}
             else { 
                 {frm.set_value('custom_non_asin',1)}

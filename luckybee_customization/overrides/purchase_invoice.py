@@ -24,60 +24,48 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				br=frappe.new_doc('Brand')
 				br.brand=brand
 				br.insert()
-		# #calculate buying price
-		# if disc: 
-		# 	rate = float(rate)
-		# 	disc = float(disc)
-		# 	discounted_price = rate - (rate * (disc / 100))
+		
 
-			
 		item_code_exist = frappe.db.exists('Item', {'item_name':description}, 'item_code')
 		if item_code_exist:
-			frappe.log_error("exis")
-			item=frappe.get_doc('Item',{'item_name':description})
-			supplierNrate={'last_supplier':[],"last_rate":[]}
+			#brand
+			new_brand=""
 			if brand=='ASSR':
 				if not frappe.db.exists('Brand','TREO'):
 					b=frappe.new_doc('Brand')
 					b.brand='TREO'
 					b.insert()
-				item.brand='TREO'
-				item.custom_luckybee_brand='TREO'
+				new_brand='TREO'
 			if brand=="CLAY":
 				if not frappe.db.exists('Brand','CLAY CRAFT'):
 					b=frappe.new_doc('Brand')
 					b.brand='CLAY CRAFT'
 					b.insert()
-				item.brand='CLAY CRAFT'
-				item.custom_luckybee_brand='CLAY CRAFT'
+				new_brand='CLAY CRAFT'
 			else:
-				item.brand=brand
-			if item.custom_last_supplier:
+				new_brand=brand
+
+			#last supplier history
+			supplierNrate={'last_supplier':[],"last_rate":[]}
+			custom_last_supplier, custom_last_supplier_purchase_rate= frappe.db.get_value("Item", {"item_name": description}, ['custom_last_supplier', 'custom_last_supplier_purchase_rate'])
+			if custom_last_supplier:
 				supplierNrate['last_supplier'].append(doc['supplier'])
 				supplierNrate['last_rate'].append(float(rate))
-				supplierNrate['last_supplier'].append(item.custom_last_supplier)
-				supplierNrate['last_rate'].append(item.custom_last_supplier_purchase_rate)
-				# if item.custom_last_supplier!=doc['supplier']:
-				item.custom_last_supplier=doc['supplier']
-				item.custom_last_supplier_purchase_rate=float(rate)
+				supplierNrate['last_supplier'].append(custom_last_supplier)
+				supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
+				
 				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
-					item.append('custom_supplier_history', {'supplier': last_supplier, 'rate':last_rate})
-			if item.custom_mrp and float(mrp) > 0 and float(item.custom_mrp) != float(mrp) :
-				item.custom_mrp = mrp
-			if item.gst_hsn_code != hsn:
-				item.gst_hsn_code = hsn
-			if item.custom_luckybee_brand != brand:
-				item.custom_luckybee_brand = brand
-			if item.custom_group != group:
-				item.custom_group = group
-			if item.custom_category != category:
-				item.custom_category = category
-			if item.custom_category_sub != sub_category:
-				item.custom_category_sub = sub_category
-			if not item.custom_barcode:
-				item.custom_barcode = item.item_code
-				barcode_row = item.append("barcodes", {})
-				barcode_row.barcode = item.item_code
+					child = frappe.get_doc({
+					'doctype': 'Supplier History',  # Replace with your child table doctype
+					'parent': item_code_exist,
+					'parentfield': 'custom_supplier_history',  # Field name of child table in the parent doctype
+					'parenttype': 'Item',
+					'supplier': last_supplier,
+					'rate': last_rate
+										})
+					child.insert(ignore_permissions=True)
+
+			#set tax template
 			gst = ""
 			disc=str(disc)
 			# if disc_perc:
@@ -87,13 +75,33 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				gst = "GST 12% - SR"
 			elif disc == "4.71":
 				gst = "GST 5% - SR"
-			item.taxes=[]
-			row = item.append("taxes", {})
-			row.item_tax_template = gst
-			item.save()
+			# Clear existing taxes and add new tax entry manually
+			frappe.db.sql('DELETE FROM `tabItem Tax` WHERE parent=%s', item_code_exist)
+			tax_entry = frappe.get_doc({
+				'doctype': 'Item Tax',  # Replace with your child table doctype
+				'parent': item_code_exist,
+				'parentfield': 'taxes',
+				'parenttype': 'Item',
+				'item_tax_template': gst
+			})
+			tax_entry.insert(ignore_permissions=True)
 
-			time.sleep(5)
 
+			# update multiple values
+			frappe.db.set_value('Item',item_code_exist, {
+				'custom_mrp':float(mrp),
+				'gst_hsn_code':hsn,
+				'custom_luckybee_brand':new_brand,
+				'brand':new_brand,
+				'custom_group':group,
+				'custom_category':category,
+				'custom_category_sub':sub_category,
+				'custom_barcode':item_code_exist,
+				'custom_last_supplier':doc['supplier'],
+				'custom_last_supplier_purchase_rate':float(rate)
+
+			})
+			
 
 		if not item_code_exist:
 			frappe.log_error("new")
@@ -154,10 +162,6 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
 			item.save()
-			time.sleep(5)
-			# if disc:
-			# create_item_price(item, lrp, discounted_price)
-		
 		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','last_purchase_rate'])
 		dict_itm.update({
 							"item_code": item_code,

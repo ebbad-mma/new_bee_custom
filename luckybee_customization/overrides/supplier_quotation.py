@@ -27,56 +27,75 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			item.custom_category_sub = sub_category
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
+			item.custom_last_supplier=doc['supplier']
+			item.custom_last_supplier_purchase_rate=float(rate)
 			item.ean = custom_ean
 			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
-			# item.custon_fsn_no = custom_fsn
 			item.insert(ignore_permissions=True)
-			# time.sleep(5)
 			item.custom_barcode = item.item_code
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
 			item.save()
-			# time.sleep(5)
-			# if disc_perc:
-			# 	create_item_price(item, lrp, discounted_price)
-			# if disc_perc:
-			# 	create_item_price(item, lrp, discounted_price)
+			item_name=item.name
+			
 		else:	
-			item=frappe.get_doc('Item',{'item_name':description})
-			if item:
-				if not mrp=="":
-					if item.custom_mrp and float(mrp) > 0 and float(item.custom_mrp) != float(mrp) :
-						item.custom_mrp = mrp
-				if item.gst_hsn_code != hsn:
-					item.gst_hsn_code = hsn
-				if item.custom_luckybee_brand != brand:
-					item.custom_luckybee_brand = brand
-				if item.custom_group != group:
-					item.custom_group = group
-				if item.custom_category != category:
-					item.custom_category = category
-				if item.custom_category_sub != sub_category:
-					item.custom_category_sub = sub_category
-				if not item.custom_barcode:
-					item.custom_barcode = item.item_code
-					barcode_row = item.append("barcodes", {})
-					barcode_row.barcode = item.item_code
-			item.save()
-			time.sleep(5)				
+			item_code_exist = frappe.db.get_value('Item', {'item_name': description}, 'item_code')
+			if item_code_exist:
+				item_name=item_code_exist
+				# Initialize the supplier and rate lists
+				supplierNrate = {'last_supplier': [], 'last_rate': []}
+
+				# Fetch the existing supplier and rate information
+				custom_last_supplier, custom_last_supplier_purchase_rate = frappe.db.get_value(
+					'Item', item_code_exist, ['custom_last_supplier', 'custom_last_supplier_purchase_rate']
+				)
+
+				# Update the supplier history
+				if custom_last_supplier:
+					supplierNrate['last_supplier'].append(doc['supplier'])
+					supplierNrate['last_rate'].append(float(rate))
+					supplierNrate['last_supplier'].append(custom_last_supplier)
+					supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
+
+					# Update the last supplier information
+					frappe.db.set_value('Item', item_code_exist, {
+						'custom_last_supplier': doc['supplier'],
+						'custom_last_supplier_purchase_rate': float(rate)
+					})
+
+					for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+						child = frappe.get_doc({
+							'doctype': 'Supplier History',  # Replace with your actual child doctype name
+							'parent': item_code_exist,
+							'parentfield': 'custom_supplier_history',  # Field name for the child table
+							'parenttype': 'Item',
+							'supplier': last_supplier,
+							'rate': last_rate
+						})
+						child.insert(ignore_permissions=True)
+				frappe.db.set_value('Item', item_code_exist, {
+					'custom_mrp': mrp,
+					'gst_hsn_code': hsn,
+					'custom_luckybee_brand': brand,
+					'brand': brand,
+					'custom_group': group,
+					'custom_category': category,
+					'custom_category_sub': sub_category,
+					'custom_barcode': item_code_exist,
+					'custom_last_supplier': doc['supplier'],
+					'custom_last_supplier_purchase_rate': float(rate)
+				})				
 		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest,brand,custom_image1,custom_amzon_item_name=frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest','brand','custom_image1','custom_amzon_item_name'])
 		# get item details to calculatelrp 
-		if frappe.db.exists('Item Details',{'item':item.name}):
-			it_det=frappe.get_doc('Item Details',{'item':item.name})
-			avg_30=it_det.list_price_30_days_avg
-			avg_90=it_det.list_price_90_days_avg
+		if frappe.db.exists('Item Details',{'item':item_name}):
+			avg_30, avg_90 = frappe.db.get_value(
+													'Item Details', 
+													{'item': item_name}, 
+													['list_price_30_days_avg', 'list_price_90_days_avg']
+												) or (None, None)
 		# Convert to integers if possible, otherwise set to 0
 		last_price_int = int(last_price) if last_price is not None and int(last_price) > 0 else 0
 		list_price_highest_int = int(list_price_highest) if list_price_highest is not None and int(list_price_highest) > 0 else 0
-		# Determine mrp based on the above logic
-		# mrp = last_price_int if last_price_int > 0 else list_price_highest_int
-		# if len(custom_amzon_item_name)>140:
-		# custom_amzon_item_name=custom_amzon_item_name[0:140]
-		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
 		dict_itm.update({
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,
@@ -91,7 +110,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 							"custom_box_number":custom_box_number,
 							"custom_reviews_count":int(reviews_count or 0),
 							"last_purchase_rate":last_purchase_rate,
-							"mrp":mrp,
+							"mrp":float(mrp),
 							"brand":brand,
 							"custom_image1":custom_image1,
 							"custom_amzon_item_name":custom_amzon_item_name,

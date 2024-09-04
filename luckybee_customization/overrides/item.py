@@ -338,7 +338,8 @@ def update_item(doc, event):
 						# frappe.db.set_value("Item", item.name, "title", products[i]['title'])
 
 			except Exception as e:
-				frappe.throw(_("Found invalid EAN"))						
+				frappe.log_error("Invalid ean")
+				# frappe.throw(_("Found invalid EAN"))						
 
 def sync_keepa_item(doc, event):
 	accesskey = '4i9vbmksc3d9o67p6fd3s9aitdaaer17c604f3qrh93auu67fnh6pfucqvqltmjm'
@@ -355,7 +356,9 @@ def sync_keepa_item(doc, event):
 			try:
 				products = api.query(ASIN, stats=30, rating=True, update=0, domain="IN", history=1)
 			except Exception as e:
-				frappe.throw(_(f"Invalid ASIN: {doc.custom_asin_no}"))
+				# frappe.throw(_(f"Invalid ASIN: {doc.custom_asin_no}"))
+				frappe.log_error(f"Invalid ASIN: {doc.custom_asin_no}")
+				return
 			else:
 				for i in range(len(ASIN)):
 					if not frappe.db.exists('Brand',products[i]['brand']):
@@ -521,12 +524,16 @@ def sync_keepa_item(doc, event):
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1,product_code_is_asin=False)
 			except Exception as e:
-				frappe.throw(_(f"Invalid EAN: {doc.custom_ean}"))
+				frappe.log_error(f"Invalid EAN: {doc.custom_ean}")
+				return
+				# frappe.throw(_(f"Invalid EAN: {doc.custom_ean}"))
 			try:
 				if product!=[]:
 					pass
 			except Exception:
-				frappe.throw(f"No products find for {doc.custom_ean}")
+				# frappe.throw(f"No products find for {doc.custom_ean}")
+				frappe.log_error(f"No products find for {doc.custom_ean}")
+				return
 			else:
 				for i in range(len(EAN)):
 					if products!=[]:
