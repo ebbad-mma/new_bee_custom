@@ -1,8 +1,14 @@
-import frappe
+import frappesafe_float_conversion
 import json
 import time
 from frappe.utils import today
-
+def safe_float_conversion(rate, default_value=0.0):
+    try:
+        rate_cleaned = rate.replace(',', '')
+        return float(rate_cleaned)
+    except ValueError:
+        frappe.msgprint(f"Could not convert rate '{rate}' to float.")
+        return default_value
 
 @frappe.whitelist()
 def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,disc3, disc, mrp, brand, group, category, sub_category,custom_asin,custom_box_number,custom_ean,custom_synced,amount):
@@ -17,7 +23,11 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			# item.item_code=custom_purchase_item
 			item.stoc_uom = per
 			item.gst_hsn_code = ''
-			item.item_name = description
+			if len(description)>130:
+				description=description[:130]
+			else:
+				description=description
+			item.item_name=description
 			item.item_group = 'All Groups'
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
@@ -28,7 +38,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
 			item.custom_last_supplier=doc['supplier']
-			item.custom_last_supplier_purchase_rate=float(rate)
+			item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
 			item.ean = custom_ean
 			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
 			item.insert(ignore_permissions=True)
@@ -53,14 +63,14 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 				# Update the supplier history
 				if custom_last_supplier:
 					supplierNrate['last_supplier'].append(doc['supplier'])
-					supplierNrate['last_rate'].append(float(rate))
+					supplierNrate['last_rate'].append(safe_float_conversion(rate))
 					supplierNrate['last_supplier'].append(custom_last_supplier)
 					supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
 
 					# Update the last supplier information
 					frappe.db.set_value('Item', item_code_exist, {
 						'custom_last_supplier': doc['supplier'],
-						'custom_last_supplier_purchase_rate': float(rate)
+						'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
 					})
 
 					for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
@@ -83,7 +93,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 					'custom_category_sub': sub_category,
 					'custom_barcode': item_code_exist,
 					'custom_last_supplier': doc['supplier'],
-					'custom_last_supplier_purchase_rate': float(rate)
+					'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
 				})				
 		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest,brand,custom_image1,custom_amzon_item_name=frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest','brand','custom_image1','custom_amzon_item_name'])
 		# get item details to calculatelrp 
@@ -102,19 +112,19 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 							"qty": qty,
 							"item_name": description,
 							"uom": "Nos",
-							"new_current":float(new_current) if new_current else 0,
-							"avg_30":float(avg_30) if avg_30 else 0,
-							"avg_90":float(avg_90) if avg_90 else 0,
+							"new_current":safe_float_conversion(new_current) if new_current else 0,
+							"avg_30":safe_float_conversion(avg_30) if avg_30 else 0,
+							"avg_90":safe_float_conversion(avg_90) if avg_90 else 0,
 							"custom_asin":custom_asin,
 							"rate":rate,
 							"custom_box_number":custom_box_number,
 							"custom_reviews_count":int(reviews_count or 0),
 							"last_purchase_rate":last_purchase_rate,
-							"mrp":float(mrp),
+							"mrp":safe_float_conversion(mrp),
 							"brand":brand,
 							"custom_image1":custom_image1,
 							"custom_amzon_item_name":custom_amzon_item_name,
-							"amount":float(amount),
+							"amount":safe_float_conversion(amount),
 							"uom":per,
 							"gst_disc":disc,
 							"disc1":disc1,
@@ -145,8 +155,8 @@ def get_total_margin(sq_items, name):
 			frappe.log_error("i",i)
 			box_number = i.get('custom_box_number')
 			frappe.log_error("bo",box_number)
-			margin_amount = float(i.get('custom_margin_in_amount'))
-			rate = float(i.get('rate'))
+			margin_amount = safe_float_conversion(i.get('custom_margin_in_amount'))
+			rate = safe_float_conversion(i.get('rate'))
 
 			# Update margin and rate for each box number
 			if box_number in margin_dict:

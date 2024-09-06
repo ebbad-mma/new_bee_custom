@@ -361,7 +361,7 @@ def sync_keepa_item(doc, event):
 				return
 			else:
 				for i in range(len(ASIN)):
-					if not frappe.db.exists('Brand',products[i]['brand']):
+					if not frappe.db.exists('Brand',{'brand':products[i]['brand']}):
 						# create a new brand if does not exists
 						n_doc = frappe.new_doc('Brand')
 						n_doc.brand =products[i]['brand']
@@ -537,7 +537,7 @@ def sync_keepa_item(doc, event):
 			else:
 				for i in range(len(EAN)):
 					if products!=[]:
-						if not frappe.db.exists('Brand',products[i]['brand']):
+						if not frappe.db.exists('Brand',{'brand':products[i]['brand']}):
 							# create a new brand if does not exists
 							n_doc = frappe.new_doc('Brand')
 							n_doc.brand =products[i]['brand']

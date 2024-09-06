@@ -7,6 +7,15 @@ def safe_int(value, default=0):
 		return int(value)
 	except (TypeError, ValueError):
 		return default
+def safe_float_conversion(rate, default_value=0.0):
+    try:
+        rate_cleaned = rate.replace(',', '')
+        return float(rate_cleaned)
+    except ValueError:
+        frappe.msgprint(f"Could not convert rate '{rate}' to float.")
+        return default_value
+
+
 
 @frappe.whitelist()
 def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc, disc1,disc2,disc3,amount):
@@ -21,7 +30,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				br.brand=brand
 				br.insert()
 		
-		int_mrp=float(mrp)
+		int_mrp=safe_float_conversion(mrp)
 		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
 		if not item_code_exist:
 			item = frappe.new_doc("Item")
@@ -29,10 +38,14 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item.item_code=item.naming_series
 			# item.item_code=custom_purchase_item
 			item.custom_last_supplier=doc['supplier']
-			item.custom_last_supplier_purchase_rate=float(rate)
+			item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
 			item.stoc_uom = per
 			item.gst_hsn_code = ''
-			item.item_name = description
+			if len(description)>130:
+				description=description[:130]
+			else:
+				description=description
+			item.item_name=description
 			item.item_group = 'All Groups'
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
@@ -83,14 +96,14 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				# Update the supplier history
 				if custom_last_supplier:
 					supplierNrate['last_supplier'].append(doc['supplier'])
-					supplierNrate['last_rate'].append(float(rate))
+					supplierNrate['last_rate'].append(safe_float_conversion(rate))
 					supplierNrate['last_supplier'].append(custom_last_supplier)
 					supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
 
 					# Update the last supplier information
 					frappe.db.set_value('Item', item_code_exist, {
 						'custom_last_supplier': doc['supplier'],
-						'custom_last_supplier_purchase_rate': float(rate)
+						'custom_last_supplier_purchase_rate':safe_float_conversion(rate)
 					})
 
 					for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
@@ -127,7 +140,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 
 				# Update multiple values
 				frappe.db.set_value('Item', item_code_exist, {
-					'custom_mrp': float(mrp),
+					'custom_mrp': safe_float_conversion(mrp),
 					'gst_hsn_code': hsn,
 					'custom_luckybee_brand': brand,
 					'brand': brand,
@@ -136,11 +149,13 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 					'custom_category_sub': sub_category,
 					'custom_barcode': item_code_exist,
 					'custom_last_supplier': doc['supplier'],
-					'custom_last_supplier_purchase_rate': float(rate)
+					'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
 				})
 
-							
-		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest'])
+
+		result = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating', 'custom_new_current', 'custom_reviews_count', 'custom_last_supplier_purchase_rate', 'custom_last_price', 'custom_list_price_highest'])
+		frappe.log_error('RESULT',f"{result}///{description}")			
+		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','custom_last_supplier_purchase_rate','custom_last_price','custom_list_price_highest'])
 		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
 		last_price_safe = safe_int(last_price)
 		list_price_highest_safe = safe_int(list_price_highest)
@@ -161,16 +176,16 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 							"qty": qty,
 							"item_name": description,
 							"uom":per,
-							"new_current":float(new_current) if new_current else 0,
-							"avg_30":float(avg_30) if avg_30 else 0,
-							"avg_90":float(avg_90) if avg_90 else 0,
+							"new_current":safe_float_conversion(new_current) if new_current else 0,
+							"avg_30":safe_float_conversion(avg_30) if avg_30 else 0,
+							"avg_90":safe_float_conversion(avg_90) if avg_90 else 0,
 							"custom_asin":custom_asin,
 							"rate":rate,
 							"custom_box_number":custom_box_number,
 							"custom_reviews_count":reviews_count,
 							"last_purchase_rate":last_purchase_rate,
 							"mrp":mrp,
-							"amount":float(amount),
+							"amount":safe_float_conversion(amount),
 							"gst_disc":disc,
 							"disc1":disc1,
 							"disc2":disc2,

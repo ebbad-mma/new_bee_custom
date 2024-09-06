@@ -28,7 +28,7 @@
  "fields": [
   {
    "fieldname": "description_of_good_and_services",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Description of Good and Services"
   },
   {
@@ -116,7 +116,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-14 14:43:21.360913",
+ "modified": "2024-09-06 12:52:48.482525",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Custom Purchase Item",

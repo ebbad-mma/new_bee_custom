@@ -164,8 +164,23 @@ frappe.ui.form.on('Purchase Invoice', {
                             if (r.message) {
                                 console.log("custsttsts0",r.message.custom_mrp)
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
+                                console.log("dissdsdd",pp_after_disc_cal)
                                 let cu_mrp=0
-                                if (r.message.custom_mrp){if(r.message.custom_mrp<=0){cu_mrp=pp_after_disc_cal}else{cu_mrp= r.message.custom_mrp}}
+                                if (r.message.custom_mrp) {
+                                    if (r.message.custom_mrp > 0) {
+                                        cu_mrp = r.message.custom_mrp;
+                                    } else {
+                                        if (pp_after_disc_cal <= 0) {
+                                            cu_mrp = r.message.rate;
+                                        }
+                                        if (pp_after_disc_cal > 0) {
+                                            cu_mrp = pp_after_disc_cal;
+                                        }
+                                    }
+                                
+                                    
+                                }
+                                
                                 console.log('[cu mrp]',cu_mrp)
                                 console.log(r.message, "r.message-------------");
                                 var item_row = cur_frm.add_child("items");
@@ -372,7 +387,7 @@ frappe.ui.form.on('Purchase Invoice Item', {
                 frappe.throw("Please first apply percentage for item");
             } else {
                 // let custom_percentage = (d.custom_percentage / 100) * d.rate;------now
-                let lrpValue = d.custom_percentage + d.rate;
+                let lrpValue = flt(d.custom_percentage/100) + flt(d.rate);
                 console.log('lrp value before conevrtin ppmu',lrpValue)
                 // Ensure lrpValue is an integer
                 lrpValue = Math.floor(lrpValue);
@@ -404,6 +419,13 @@ frappe.ui.form.on('Purchase Invoice Item', {
                     custom_discount = Math.round(dis);
                 console.log("custom_diafte",custom_discount)
 
+                // if (custom_discount<15){
+                //     console.log("hehgwhewewhe")
+                //     let new_mrp=lrpValue/0.85
+                //     frappe.model.set_value(cdt, cdn, 'custom_mrp',new_mrp);
+                //     custom_discount=15
+                // }
+
                 }
         
                 // Calculate margin
@@ -423,14 +445,16 @@ frappe.ui.form.on('Purchase Invoice Item', {
                 frappe.throw("Please first apply percentage for item");
             } else {
                 // Apply logic for MRPD
-                let discount = (d.custom_mrp * d.custom_percentage / 100);
+                let discount = (flt(d.custom_mrp) * flt(d.custom_percentage )/ 100);
                 let lrpValue = d.custom_mrp - discount;
+                console.log("lrp",lrpValue)
         
                 // Ensure lrpValue is an integer and ends with 9
                 lrpValue = Math.floor(lrpValue);
                 if (lrpValue % 10 !== 9) {
                     lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
                 }
+                console.log("lrpafter9",lrpValue)
         
                 let discount_on_mrp = d.custom_mrp - lrpValue;
                 let dis = (discount_on_mrp * 100) / d.custom_mrp;
@@ -464,37 +488,29 @@ frappe.ui.form.on('Purchase Invoice Item', {
     },
     // ------------------------comment for now---------------------
 
-    // custom_percentage: function(frm, cdt, cdn) {
-    //     let d = locals[cdt][cdn];
-    // if(d.custom_ppmumrpdap=='PPMU' || d.custom_ppmumrpdap=='MRPD'){
+    custom_changediscount: function(frm, cdt, cdn) {
+        let d = locals[cdt][cdn];
+    if(d.custom_ppmumrpdap=='PPMU'){
+        let disc_per=d.custom_changediscount/100
+        console.log("disc_perc",disc_per)
+        let lrpValue=d.custom_mrp-((disc_per*d.custom_mrp)/100)
+        console.log("lrp",lrpValue)
+        lrpValue = Math.floor(lrpValue);
+        frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
+        frappe.model.set_value(cdt, cdn, 'custom_margin', d.custom_changediscount); }
+    if(d.custom_ppmumrpdap=='MRPD'){
+        let disc_per=d.custom_changediscount/100
+        console.log("disc_perc",disc_per)
+        let dis_lrp=d.custom_mrp*disc_per
+        let lrpValue=d.custom_mrp-dis_lrp
+        console.log("lrp",lrpValue)
+        lrpValue = Math.floor(lrpValue);
+        let margin = ((d.custom_mrp - lrpValue) / d.custom_mrp) * 100;
+        frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
+        frappe.model.set_value(cdt, cdn, 'custom_margin',margin); }
 
-    //     function applyDiscount(discountPercentage, frm, cdt, cdn) {
-    //         let lrpValue = (d.custom_new_current * discountPercentage) / 100;
-    //          if (typeof lrpValue === 'number' && !Number.isInteger(lrpValue)) {
-    //         let int_lrp = Math.floor(lrpValue);
-    //         if (int_lrp % 10 === 9) {
-    //             lrpValue = int_lrp;
-    //         } else {
-    //             let stringValue = int_lrp.toString();
-    //             let modifiedString = stringValue.slice(0, -1) + '9';
-    //             lrpValue = parseFloat(modifiedString);
-    //         }
-    //     }
-    //         let discount_on_margin = lrpValue - d.rate;
-    //         let margin = (discount_on_margin / d.rate * 100);
-    //         let discount_on_mrp = d.custom_mrp - lrpValue;
-    //         let dis = (discount_on_mrp * 100) / d.custom_mrp;
-    //         let custom_discount = Math.round(dis / 10) * 10;
-    //         frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
-           
-    //         frappe.model.set_value(cdt, cdn, 'custom_lrp', lrpValue);
-    //         frappe.model.set_value(cdt, cdn, 'custom_percentage', discountPercentage);
-    //         frappe.model.set_value(cdt, cdn, 'custom_margin', margin);
-    //     }}
-
-    //     if (d.custom_ppmumrpdap === 'PASP') {
-    //         applyDiscount(d.custom_percentage, frm, cdt, cdn);
-    //     }}
+        
+    }
 
     // ------------------------comment for now-----------------------
 })

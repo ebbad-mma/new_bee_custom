@@ -3,7 +3,13 @@ import json
 import time
 from frappe.utils import today
 
-
+def safe_float_conversion(rate, default_value=0.0):
+    try:
+        rate_cleaned = rate.replace(',', '')
+        return float(rate_cleaned)
+    except ValueError:
+        frappe.msgprint(f"Could not convert rate '{rate}' to float.")
+        return default_value
 @frappe.whitelist()
 def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,disc3, disc, gst, mrp, lrp, brand, group, category, sub_category):
 	frappe.log_error(f"{disc1}-{disc2}-{disc3}-{disc}")
@@ -50,7 +56,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			custom_last_supplier, custom_last_supplier_purchase_rate= frappe.db.get_value("Item", {"item_name": description}, ['custom_last_supplier', 'custom_last_supplier_purchase_rate'])
 			if custom_last_supplier:
 				supplierNrate['last_supplier'].append(doc['supplier'])
-				supplierNrate['last_rate'].append(float(rate))
+				supplierNrate['last_rate'].append(safe_float_conversion(rate))
 				supplierNrate['last_supplier'].append(custom_last_supplier)
 				supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
 				
@@ -89,7 +95,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 
 			# update multiple values
 			frappe.db.set_value('Item',item_code_exist, {
-				'custom_mrp':float(mrp),
+				'custom_mrp':safe_float_conversion(mrp),
 				'gst_hsn_code':hsn,
 				'custom_luckybee_brand':new_brand,
 				'brand':new_brand,
@@ -98,7 +104,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				'custom_category_sub':sub_category,
 				'custom_barcode':item_code_exist,
 				'custom_last_supplier':doc['supplier'],
-				'custom_last_supplier_purchase_rate':float(rate)
+				'custom_last_supplier_purchase_rate':safe_float_conversion(rate)
 
 			})
 			
@@ -110,12 +116,16 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			# item.item_code=custom_purchase_item
 			item.stock_uom = per
 			item.gst_hsn_code = ''
-			item.item_name = description
+			if len(description)>130:
+				description=description[:130]
+			else:
+				description=description
+			item.item_name=description
 			item.item_group = 'All Groups'
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_last_supplier=doc['supplier']
-			item.custom_last_supplier_purchase_rate=float(rate)
+			item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
 			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
 			# item.append('custom_supplier_history',{'supplier':doc['supplier'],'rate':float(rate)})
 			if brand=='ASSR':
@@ -170,7 +180,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 							"item_name": description,
 							"uom": per,
 							"rate": rate,
-							"amount": int(qty)*float(rate),
+							"amount": int(qty)*safe_float_conversion(rate),
 							"last_purchase_rate":last_purchase_rate,
 							"last_purchase_rate":last_purchase_rate,
 							"custom_mrp":mrp,
