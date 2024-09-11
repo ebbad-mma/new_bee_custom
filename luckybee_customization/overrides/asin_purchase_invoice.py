@@ -18,7 +18,7 @@ def safe_float_conversion(rate, default_value=0.0):
 
 
 @frappe.whitelist()
-def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc, disc1,disc2,disc3,amount):
+def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc, disc1,disc2,disc3,amount,item_index):
 	doc = json.loads(doc)
 	item_name=''
 	dict_itm = {}
@@ -164,6 +164,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			reviews_count=int(reviews_count)
 		
 		# get item details to calculatelrp 
+		avg_30, avg_90 = None, None
 		if frappe.db.exists('Item Details',{'item':item_name}):
 			avg_30, avg_90 = frappe.db.get_value(
 													'Item Details', 
@@ -190,7 +191,8 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 							"disc1":disc1,
 							"disc2":disc2,
 							"disc3":disc3,
-							"gst_template":gst
+							"gst_template":gst,
+							"item_index":int(item_index)
 						})
 	return dict_itm
 

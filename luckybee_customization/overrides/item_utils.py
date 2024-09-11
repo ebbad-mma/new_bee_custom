@@ -12,6 +12,7 @@ def check_image(doc,method=None):
     #         else:
     #             doc.db_set('custom_image1',i.image)
     #create item details
+    update_stock_in_hand_in_item_master(doc)
     if doc.custom_asin_no:
         item_details=frappe.get_doc('Item Details',{'asin_no':doc.custom_asin_no})
         item_details.amazon_item_url=f"https://www.amazon.in/dp/{doc.custom_asin_no}"
@@ -164,6 +165,9 @@ def update_item_in_woocom():
 
 
 
-
-
+# -----------------------HELPER FUNCTION  TO UPDATE STOCK IN HAND FIELD IN ITEM MASTER---------------
+def update_stock_in_hand_in_item_master(doc):
+    if frappe.db.exists('Bin',{'item_code':doc.name}):
+        actual_qty=frappe.db.get_value('Bin',{'item_code':doc.name},'actual_qty')
+        doc.db_set('custom_stock_in_hand',actual_qty)
 

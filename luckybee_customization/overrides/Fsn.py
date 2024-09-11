@@ -5,7 +5,7 @@ from frappe.utils import today
 
 
 @frappe.whitelist()
-def search_and_insert_item(doc,description,fsn, qty, rate, per, mrp, lrp):
+def search_and_insert_item(doc,description,fsn, qty, rate, per, mrp, lrp,item_index):
 	doc = json.loads(doc)
 	dict_itm = {}
 	if description :
@@ -64,7 +64,8 @@ def search_and_insert_item(doc,description,fsn, qty, rate, per, mrp, lrp):
 							"qty": qty,
 							"item_name": description,
 							"uom":per,
-							"custom_mrp":mrp
+							"custom_mrp":mrp,
+							"item_index":int(item_index)
 						})
 		return dict_itm
 

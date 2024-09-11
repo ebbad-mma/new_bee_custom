@@ -1,4 +1,4 @@
-import frappesafe_float_conversion
+import frappe
 import json
 import time
 from frappe.utils import today
@@ -11,7 +11,7 @@ def safe_float_conversion(rate, default_value=0.0):
         return default_value
 
 @frappe.whitelist()
-def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,disc3, disc, mrp, brand, group, category, sub_category,custom_asin,custom_box_number,custom_ean,custom_synced,amount):
+def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,disc3, disc, mrp, brand, group, category, sub_category,custom_asin,custom_box_number,custom_ean,custom_synced,amount,item_index):
 	doc = json.loads(doc)
 	custom_synced=int(custom_synced)
 	dict_itm = {}
@@ -23,8 +23,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			# item.item_code=custom_purchase_item
 			item.stoc_uom = per
 			item.gst_hsn_code = ''
-			if len(description)>130:
-				description=description[:130]
+			if len(description)>139:
+				description=description[:139]
 			else:
 				description=description
 			item.item_name=description
@@ -110,7 +110,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,
 							"qty": qty,
-							"item_name": description,
+							"item_name": description[:139],
 							"uom": "Nos",
 							"new_current":safe_float_conversion(new_current) if new_current else 0,
 							"avg_30":safe_float_conversion(avg_30) if avg_30 else 0,
@@ -123,13 +123,14 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 							"mrp":safe_float_conversion(mrp),
 							"brand":brand,
 							"custom_image1":custom_image1,
-							"custom_amzon_item_name":custom_amzon_item_name,
+							"custom_amzon_item_name":custom_amzon_item_name[1:139],
 							"amount":safe_float_conversion(amount),
 							"uom":per,
 							"gst_disc":disc,
 							"disc1":disc1,
 							"disc2":disc2,
-							"disc3":disc3
+							"disc3":disc3,
+							"item_index":int(item_index)
 						})
 	else:
 		dict_itm.update({})
@@ -152,20 +153,26 @@ def get_total_margin(sq_items, name):
 		sq_items = json.loads(sq_items)
 		frappe.log_error("sq",sq_items)
 		for i in sq_items:
-			frappe.log_error("i",i)
 			box_number = i.get('custom_box_number')
 			frappe.log_error("bo",box_number)
-			margin_amount = safe_float_conversion(i.get('custom_margin_in_amount'))
-			rate = safe_float_conversion(i.get('rate'))
+			margin_amount = i.get('custom_margin_in_amount')
+			frappe.log_error("margin amount",margin_amount)
+			rate = i.get('rate')
+			frappe.log_error('rate',rate)
 
 			# Update margin and rate for each box number
 			if box_number in margin_dict:
+				frappe.log_error("andar")
 				margin_dict[box_number]['total_margin'] += margin_amount
 				margin_dict[box_number]['rate'] += rate
+				frappe.log_error("bhar",margin_dict)
 			else:
 				margin_dict[box_number] = {'total_margin': margin_amount, 'rate': rate}
+				frappe.log_error('else',margin_dict)
+		# frappe.throw(f"{margin_list}")
 		margin_list = []
 		for k, v in margin_dict.items():
+			frappe.log_error("k",k)
 			margin_percentage = round((v['total_margin'] / v['rate']) * 100, 2)
 			margin_list.append({'box_number': k, 'total_margin': v['total_margin'], 'rate': v['rate'], 'margin_':margin_percentage})
 		# Get the parent document
@@ -182,7 +189,8 @@ def get_total_margin(sq_items, name):
 		return {'status': 'success', 'message': 'Margin details updated successfully'}
 
 	except Exception as e:
-		return {'status': 'failed', 'message': str(e)}
+		frappe.log_error('SQ Eroror',str(e))
+		# return {'status': 'failed', 'message': str(e)}
 
 
 	

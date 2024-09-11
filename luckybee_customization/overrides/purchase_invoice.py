@@ -11,7 +11,7 @@ def safe_float_conversion(rate, default_value=0.0):
         frappe.msgprint(f"Could not convert rate '{rate}' to float.")
         return default_value
 @frappe.whitelist()
-def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,disc3, disc, gst, mrp, lrp, brand, group, category, sub_category):
+def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,disc3, disc, gst, mrp, lrp, brand, group, category, sub_category,item_index):
 	frappe.log_error(f"{disc1}-{disc2}-{disc3}-{disc}")
 	doc = json.loads(doc)
 	dict_itm = {}
@@ -188,7 +188,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 							"disc1":disc1,
 							"disc2":disc2,
 							"disc3":disc3,
-							"gst_template":gst
+							"gst_template":gst,
+							"item_index":int(item_index)
 						})
 		frappe.log_error("dict",dict_itm)
 		return dict_itm

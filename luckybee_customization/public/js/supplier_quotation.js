@@ -2,7 +2,7 @@ frappe.ui.form.on('Supplier Quotation', {
     custom_search_and_insert_item(frm,cdt,cdn) {
         let purchase =frm.doc.custom_supplier_quotation_item;
             // console.log(purchase[0].custom_box_number)
-            if (purchase[0].custom_box_number || purchase[0].custom_asin || purchase[0].custom_ean){frm.doc.custom_is_asin =1
+            if (purchase[0].custom_asin || purchase[0].custom_ean){frm.doc.custom_is_asin =1
             }
 
        if(!frm.doc.supplier){frappe.msgprint('Please select supplier')}
@@ -34,15 +34,14 @@ frappe.ui.form.on('Supplier Quotation', {
                             'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
                             "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
                             "custom_synced": obj.custom_synced != null ? obj.custom_synced :"0",
-                            "amount": obj.amount != null ? obj.amount :"0"
+                            "amount": obj.amount != null ? obj.amount :"0",
+                            "item_index": obj.idx
                         },
                         freeze: true,
                         freeze_message: "loading items...",
                         callback: function (r) {
                             if (r.message.item_code) {
-                                console.log("custsttsts0",r.message.custom_mrp)
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
-                                console.log("dissdsdd",pp_after_disc_cal)
                                 let cu_mrp=0
                                 if (r.message.mrp) {
                                     if (r.message.mrp > 0) {
@@ -59,10 +58,11 @@ frappe.ui.form.on('Supplier Quotation', {
                                     
                                 }
                                 
-                                console.log('[cu mrp]',cu_mrp)
                                 console.log("r message",r)
                                 var item_row = cur_frm.add_child("items");
                                 item_row.item_code = r.message.item_code;
+                                item_row.custom_item_index = r.message.item_index;
+                                item_row.idx = r.message.item_index;
                                 item_row.item_name = r.message.custom_amzon_item_name;
                                 item_row.qty = r.message.qty;
                                 item_row.uom = r.message.uom;
@@ -91,14 +91,17 @@ frappe.ui.form.on('Supplier Quotation', {
                                 // console.log("checkkkkk",item_row.item_name)
                                 // item_row.rate = r.message.rate;
                                 cur_frm.refresh_fields("items");
-                                if (frm.is_new()) {
-                                    // Set the company currency
-                                    frm.set_value('company','Samyak Resources');
-                                    console.log("save form first tie")
-                                    // Save the form
-                                    frm.save();
-                                }
-                                // cur_frm.save();
+
+                                // -------------comment today-------------
+                                // if (frm.is_new()) {
+                                //     // Set the company currency
+                                //     frm.set_value('company','Samyak Resources');
+                                //     console.log("save form first tie")
+                                //     // Save the form
+                                //     frm.save();
+                                // }
+                                // ---------------comment today----------
+                                cur_frm.save();
                                 for (let item of cur_frm.doc.custom_supplier_quotation_item) {
                                     if (item.description_of_good_and_services === r.message.item_name) {
                                         item.custom_synced =1;
@@ -278,29 +281,34 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
 
 // -----------------------------------------decision maker----------------------------------------------------------
 
-
 frappe.ui.form.on('Supplier Quotation', {
-	custom_get_total_margin(frm) {
-		frappe.call({
-            method:"luckybee_customization.overrides.supplier_quotation.get_total_margin",
-            args: {
-                sq_items:frm.doc.items,
-                name:frm.doc.name
-            },
-            // disable the button until the request is completed
-            btn: $('.primary-action'),
-            // freeze the screen until the request is completed
-            freeze: true,
-            callback: (r) => {
-                // on success
-                window.location.reload();
-            },
-            error: (r) => {
-                // on error
-            }
-        })
-	}
-})
+    custom_get_total_margin(frm) {
+        // Sort the child table and ensure it returns a promise
+        sortChildTable(frm).then(() => {
+            // Run the next function after sorting is complete
+            setTimeout(() => {
+                console.log("pppppppp");
+                frappe.call({
+                    method: "luckybee_customization.overrides.supplier_quotation.get_total_margin",
+                    args: {
+                        sq_items: frm.doc.items,
+                        name: frm.doc.name
+                    },
+                    btn: $('.primary-action'),
+                    freeze: true,
+                    callback: (r) => {
+                        window.location.reload();
+                    },
+                    error: (r) => {
+                        // Handle any errors
+                    }
+                });
+            }, 5000); // Delay for 5 seconds (5000 milliseconds)
+        });
+    }
+});
+
+
 
 
 
@@ -405,3 +413,68 @@ function pp_after_disc(rate, disc1, disc2, disc3) {
 
     return finalRate.toFixed(2); // Return the final rate rounded to two decimal places
 }
+
+
+
+// ---------------------helper function to sort item table on validate----------------------
+// function sortChildTable(frm) {
+//     // Get the child table data
+//     let items = frm.doc.items;
+
+//     // Sort the child table data by custom_item_index
+//     items.sort((a, b) => (a.custom_item_index || 0) - (b.custom_item_index || 0));
+//     console.log("item after sort",items)
+    
+//     frm.clear_table('items');
+//     items.forEach(item => {
+//         // Add a new row to the child table
+//         let newRow = frm.add_child('items');
+
+//         for (let key in item) {
+//             if (item.hasOwnProperty(key) && key !== 'name') { 
+//                 newRow[key] = item[key];
+//             }
+//         }
+//     });
+
+//     // Refresh the field to show the updated data
+//     frm.refresh_field('items'); 
+//     frm.save()
+//     resolve();
+// }
+
+function sortChildTable(frm) {
+    return new Promise((resolve) => {
+        // Get the child table data
+        let items = frm.doc.items;
+
+        // Sort the child table data by custom_item_index
+        items.sort((a, b) => (a.custom_item_index || 0) - (b.custom_item_index || 0));
+        console.log("item after sort", items);
+
+        // Clear the existing child table
+        frm.clear_table('items');
+
+        // Add sorted items back to the child table
+        items.forEach(item => {
+            let newRow = frm.add_child('items');
+
+            // Copy all properties except 'name' to the new row
+            for (let key in item) {
+                if (item.hasOwnProperty(key) && key !== 'name') {
+                    newRow[key] = item[key];
+                }
+            }
+        });
+
+        // Refresh the field to show the updated data
+        frm.refresh_field('items');
+
+        // Save the form
+        frm.save();
+
+        // Resolve the promise after sorting and saving are complete
+        resolve();
+    });
+}
+

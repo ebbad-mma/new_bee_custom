@@ -34,6 +34,7 @@
 frappe.ui.form.on('Product Finder', {
     create_selected_items: function(frm) {
             let selected = frm.get_selected();
+			let item_to_be_update=frm.doc.item
             console.log("Selected rows:", selected);
 
             // Check if any rows are selected
@@ -58,15 +59,18 @@ frappe.ui.form.on('Product Finder', {
 				method: 'luckybee_customization.overrides.product_finder.update_item',
 				args: {
 					create_items:items_to_keep,
-					selected_item:titles},
+					selected_item:titles,
+					item_to_be_update:item_to_be_update || ""},
 				// disable the button until the request is completed
 				btn: $('.primary-action'),
 				// freeze the screen until the request is completed
 				freeze: true,
 				callback: (r) => {
 					// on success
-					cur_frm.save()
-					// console.log("dodosd")
+					console.log(r.message.item_name,"lll")
+					// cur_frm.save()
+					frappe.set_route('Form','Item',r.message.item_name)
+					window.location.reload()
 				},
 				error: (r) => {
 					// on error
