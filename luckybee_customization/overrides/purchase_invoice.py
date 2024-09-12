@@ -55,20 +55,57 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			supplierNrate={'last_supplier':[],"last_rate":[]}
 			custom_last_supplier, custom_last_supplier_purchase_rate= frappe.db.get_value("Item", {"item_name": description}, ['custom_last_supplier', 'custom_last_supplier_purchase_rate'])
 			if custom_last_supplier:
-				supplierNrate['last_supplier'].append(doc['supplier'])
-				supplierNrate['last_rate'].append(safe_float_conversion(rate))
+				# supplierNrate['last_supplier'].append(doc['supplier'])
+				# supplierNrate['last_rate'].append(safe_float_conversion(rate))
 				supplierNrate['last_supplier'].append(custom_last_supplier)
 				supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
 				
-				for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+				# for last_supplier,last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+					# child = frappe.get_doc({
+					# 'doctype': 'Supplier History',  # Replace with your child table doctype
+					# 'parent': item_code_exist,
+					# 'parentfield': 'custom_supplier_history',  # Field name of child table in the parent doctype
+					# 'parenttype': 'Item',
+					# 'supplier': last_supplier,
+					# 'rate': last_rate
+					# 					})
+					# child.insert(ignore_permissions=True)
+				# Step 1: Fetch all existing child entries for the specific parent (item_code_exist)
+				old_entries = frappe.get_all(
+					'Supplier History',  # Replace with your actual child doctype name
+					filters={'parent': item_code_exist, 'parenttype': 'Item'},
+					fields=['name', 'supplier', 'rate'],
+					order_by='idx'  # Fetch them in their existing order
+				)
+
+				# Step 2: Insert new supplier entries first
+				new_entries = []
+				for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+					new_entry = frappe.get_doc({
+						'doctype': 'Supplier History',  # Replace with your actual child doctype name
+						'parent': item_code_exist,
+						'parentfield': 'custom_supplier_history',  # Field name for the child table
+						'parenttype': 'Item',
+						'supplier': last_supplier,
+						'rate': last_rate
+					})
+					new_entry.insert(ignore_permissions=True)
+					new_entries.append(new_entry)
+
+				# Step 3: Delete old entries
+				for entry in old_entries:
+					frappe.delete_doc('Supplier History', entry['name'], ignore_permissions=True)
+
+				# Step 4: Reinsert old entries after the new entries
+				for entry in old_entries:
 					child = frappe.get_doc({
-					'doctype': 'Supplier History',  # Replace with your child table doctype
-					'parent': item_code_exist,
-					'parentfield': 'custom_supplier_history',  # Field name of child table in the parent doctype
-					'parenttype': 'Item',
-					'supplier': last_supplier,
-					'rate': last_rate
-										})
+						'doctype': 'Supplier History',  # Replace with your actual child doctype name
+						'parent': item_code_exist,
+						'parentfield': 'custom_supplier_history',  # Field name for the child table
+						'parenttype': 'Item',
+						'supplier': entry['supplier'],
+						'rate': entry['rate']
+					})
 					child.insert(ignore_permissions=True)
 
 			#set tax template
