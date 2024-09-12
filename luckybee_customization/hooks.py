@@ -249,6 +249,9 @@ doc_events = {"Item": {
         "Sales Invoice": {
 		"on_submit": "luckybee_customization.overrides.sales_invoice.update_stock_in_hand_in_item_master_on_si_submit"
         },
+        "Purchase Order": {
+		"on_submit": "luckybee_customization.overrides.purchase_order.remove_unselected_item_from_item_master"
+        },
         "Branch": {
 		"validate": "luckybee_customization.woocommerce.test.test"
 		# "validate": "luckybee_customization.woocommerce.test2.test"

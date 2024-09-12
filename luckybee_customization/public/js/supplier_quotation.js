@@ -101,7 +101,7 @@ frappe.ui.form.on('Supplier Quotation', {
                                 //     frm.save();
                                 // }
                                 // ---------------comment today----------
-                                cur_frm.save();
+                                // cur_frm.save();
                                 for (let item of cur_frm.doc.custom_supplier_quotation_item) {
                                     if (item.description_of_good_and_services === r.message.item_name) {
                                         item.custom_synced =1;
@@ -170,15 +170,15 @@ frappe.ui.form.on('Supplier Quotation', {
 
 
 
-// ------------for amazon price rule-----------------------
+// / ------------for amazon price rule-----------------------
 
 function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
     console.log(d,"--------------d")
     let result=0;
-    // console.log("Result",result)
-    // console.log("custom_asp",d.custom_asp)
-    // console.log("custom_avg_30",d.custom_avg_30)
-    // console.log("custom_avg_90",d.custom_avg_90)
+    console.log("Result",result)
+    console.log("custom_asp",d.custom_new_current)
+    console.log("custom_avg_30",d.custom_avg_30)
+    console.log("custom_avg_90",d.custom_avg_90)
     if (d.custom_new_current > 0) {
         result = d.custom_new_current;
     } else if(d.custom_avg_30 > 0){
@@ -279,6 +279,7 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
 
 
 
+
 // -----------------------------------------decision maker----------------------------------------------------------
 
 frappe.ui.form.on('Supplier Quotation', {
@@ -332,7 +333,10 @@ frappe.ui.form.on('Supplier Quotation', {
                 let items_to_keep = frm.doc.items.filter(item => {
                     return boxNumbers.includes(item.custom_box_number);
                 });
-
+                // Add 'supplier_quotation' key to each item in the items_to_keep array
+                items_to_keep.forEach(item => {
+                    item['supplier_quotation'] = frm.doc.name;
+                });
                console.log(items_to_keep)
                 let current=new Date()
                 console.log(current.getDate())
@@ -340,6 +344,8 @@ frappe.ui.form.on('Supplier Quotation', {
                frappe.db.insert({
                 doctype: 'Purchase Order',
                 supplier:frm.doc.supplier,
+                ref_sq:frm.doc.name,
+                // custom_sq_reference:frm.doc.name,
                 transaction_date:frappe.datetime.nowdate(),
                 items:items_to_keep,
                 schedule_date:frappe.datetime.nowdate()
@@ -471,7 +477,7 @@ function sortChildTable(frm) {
         frm.refresh_field('items');
 
         // Save the form
-        frm.save();
+        cur_frm.save();
 
         // Resolve the promise after sorting and saving are complete
         resolve();

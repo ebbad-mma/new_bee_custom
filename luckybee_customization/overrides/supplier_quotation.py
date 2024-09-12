@@ -18,7 +18,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 	if description and custom_synced==0:
 		if not frappe.db.exists('Item',{'item_name':description}):
 			item = frappe.new_doc("Item")
-			item.naming_series = 'SQ.#####'
+			# item.naming_series = 'SQ.#####'
 			# item.custom_sq_items=1
 			# item.item_code=custom_purchase_item
 			item.stoc_uom = per
@@ -37,8 +37,8 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			item.custom_category_sub = sub_category
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
-			item.custom_last_supplier=doc['supplier']
-			item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
+			# item.custom_last_supplier=doc['supplier']
+			# item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
 			item.ean = custom_ean
 			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
 			item.insert(ignore_permissions=True)
@@ -53,36 +53,36 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			if item_code_exist:
 				item_name=item_code_exist
 				# Initialize the supplier and rate lists
-				supplierNrate = {'last_supplier': [], 'last_rate': []}
+				# supplierNrate = {'last_supplier': [], 'last_rate': []}
 
-				# Fetch the existing supplier and rate information
-				custom_last_supplier, custom_last_supplier_purchase_rate = frappe.db.get_value(
-					'Item', item_code_exist, ['custom_last_supplier', 'custom_last_supplier_purchase_rate']
-				)
+				# # Fetch the existing supplier and rate information
+				# custom_last_supplier, custom_last_supplier_purchase_rate = frappe.db.get_value(
+				# 	'Item', item_code_exist, ['custom_last_supplier', 'custom_last_supplier_purchase_rate']
+				# )
 
-				# Update the supplier history
-				if custom_last_supplier:
-					supplierNrate['last_supplier'].append(doc['supplier'])
-					supplierNrate['last_rate'].append(safe_float_conversion(rate))
-					supplierNrate['last_supplier'].append(custom_last_supplier)
-					supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
+				# # Update the supplier history
+				# if custom_last_supplier:
+				# 	supplierNrate['last_supplier'].append(doc['supplier'])
+				# 	supplierNrate['last_rate'].append(safe_float_conversion(rate))
+				# 	supplierNrate['last_supplier'].append(custom_last_supplier)
+				# 	supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
 
-					# Update the last supplier information
-					frappe.db.set_value('Item', item_code_exist, {
-						'custom_last_supplier': doc['supplier'],
-						'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
-					})
+				# 	# Update the last supplier information
+				# 	frappe.db.set_value('Item', item_code_exist, {
+				# 		'custom_last_supplier': doc['supplier'],
+				# 		'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
+				# 	})
 
-					for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
-						child = frappe.get_doc({
-							'doctype': 'Supplier History',  # Replace with your actual child doctype name
-							'parent': item_code_exist,
-							'parentfield': 'custom_supplier_history',  # Field name for the child table
-							'parenttype': 'Item',
-							'supplier': last_supplier,
-							'rate': last_rate
-						})
-						child.insert(ignore_permissions=True)
+				# 	for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
+				# 		child = frappe.get_doc({
+				# 			'doctype': 'Supplier History',  # Replace with your actual child doctype name
+				# 			'parent': item_code_exist,
+				# 			'parentfield': 'custom_supplier_history',  # Field name for the child table
+				# 			'parenttype': 'Item',
+				# 			'supplier': last_supplier,
+				# 			'rate': last_rate
+				# 		})
+				# 		child.insert(ignore_permissions=True)
 				frappe.db.set_value('Item', item_code_exist, {
 					'custom_mrp': mrp,
 					'gst_hsn_code': hsn,
@@ -92,8 +92,9 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 					'custom_category': category,
 					'custom_category_sub': sub_category,
 					'custom_barcode': item_code_exist,
-					'custom_last_supplier': doc['supplier'],
-					'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
+					'custom_sq_item': 1
+					# 'custom_last_supplier': doc['supplier'],
+					# 'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
 				})				
 		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest,brand,custom_image1,custom_amzon_item_name=frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest','brand','custom_image1','custom_amzon_item_name'])
 		# get item details to calculatelrp 
@@ -134,7 +135,6 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 						})
 	else:
 		dict_itm.update({})
-# doc.save()
 	return dict_itm
 
 

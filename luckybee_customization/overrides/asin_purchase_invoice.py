@@ -19,6 +19,7 @@ def safe_float_conversion(rate, default_value=0.0):
 
 @frappe.whitelist()
 def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand, group, category, sub_category,custom_asin,custom_box_number, custom_ean,disc, disc1,disc2,disc3,amount,item_index):
+	frappe.log_error('MRP',mrp)
 	doc = json.loads(doc)
 	item_name=''
 	dict_itm = {}
@@ -30,7 +31,8 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				br.brand=brand
 				br.insert()
 		
-		int_mrp=safe_float_conversion(mrp)
+		mrp=safe_float_conversion(str(mrp))
+		frappe.log_error("int",mrp)
 		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
 		if not item_code_exist:
 			item = frappe.new_doc("Item")
@@ -38,7 +40,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			item.item_code=item.naming_series
 			# item.item_code=custom_purchase_item
 			item.custom_last_supplier=doc['supplier']
-			item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
+			item.custom_last_supplier_purchase_rate=safe_float_conversion(str(rate))
 			item.stoc_uom = per
 			item.gst_hsn_code = ''
 			if len(description)>130:
@@ -96,14 +98,14 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				# Update the supplier history
 				if custom_last_supplier:
 					supplierNrate['last_supplier'].append(doc['supplier'])
-					supplierNrate['last_rate'].append(safe_float_conversion(rate))
+					supplierNrate['last_rate'].append(safe_float_conversion(str(rate)))
 					supplierNrate['last_supplier'].append(custom_last_supplier)
 					supplierNrate['last_rate'].append(custom_last_supplier_purchase_rate)
 
 					# Update the last supplier information
 					frappe.db.set_value('Item', item_code_exist, {
 						'custom_last_supplier': doc['supplier'],
-						'custom_last_supplier_purchase_rate':safe_float_conversion(rate)
+						'custom_last_supplier_purchase_rate':safe_float_conversion(str(rate))
 					})
 
 					for last_supplier, last_rate in zip(supplierNrate['last_supplier'], supplierNrate['last_rate']):
@@ -140,7 +142,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 
 				# Update multiple values
 				frappe.db.set_value('Item', item_code_exist, {
-					'custom_mrp': safe_float_conversion(mrp),
+					'custom_mrp': safe_float_conversion(str(mrp)),
 					'gst_hsn_code': hsn,
 					'custom_luckybee_brand': brand,
 					'brand': brand,
@@ -149,7 +151,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 					'custom_category_sub': sub_category,
 					'custom_barcode': item_code_exist,
 					'custom_last_supplier': doc['supplier'],
-					'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
+					'custom_last_supplier_purchase_rate': safe_float_conversion(str(rate))
 				})
 
 
@@ -159,7 +161,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
 		last_price_safe = safe_int(last_price)
 		list_price_highest_safe = safe_int(list_price_highest)
-		mrp = last_price_safe if last_price_safe > 0 else list_price_highest_safe
+		# mrp = last_price_safe if last_price_safe > 0 else list_price_highest_safe
 		if reviews_count is not None:
 			reviews_count=int(reviews_count)
 		
@@ -177,16 +179,16 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 							"qty": qty,
 							"item_name": description,
 							"uom":per,
-							"new_current":safe_float_conversion(new_current) if new_current else 0,
-							"avg_30":safe_float_conversion(avg_30) if avg_30 else 0,
-							"avg_90":safe_float_conversion(avg_90) if avg_90 else 0,
+							"new_current":safe_float_conversion(str(new_current)) if new_current else 0,
+							"avg_30":safe_float_conversion(str(avg_30)) if avg_30 else 0,
+							"avg_90":safe_float_conversion(str(avg_90)) if avg_90 else 0,
 							"custom_asin":custom_asin,
 							"rate":rate,
 							"custom_box_number":custom_box_number,
 							"custom_reviews_count":reviews_count,
 							"last_purchase_rate":last_purchase_rate,
-							"mrp":mrp,
-							"amount":safe_float_conversion(amount),
+							"mrp":safe_float_conversion(str(mrp)),
+							"amount":safe_float_conversion(str(amount)),
 							"gst_disc":disc,
 							"disc1":disc1,
 							"disc2":disc2,
@@ -194,5 +196,6 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 							"gst_template":gst,
 							"item_index":int(item_index)
 						})
+		frappe.log_error("dict",dict_itm)
 	return dict_itm
 
