@@ -58,7 +58,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                 if (r.message) {
                                     let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                     let cu_mrp=0
-                                if (r.message.mrp){if(r.message.mrp<=0){cu_mrp=pp_after_disc_cal}else{cu_mrp= r.message.mrp}}
+                                    if(flt(r.message.mrp)<=0){cu_mrp=flt(r.message.rate)}
                                     console.log("R MESSAGE",r.message)
                                     var item_row = cur_frm.add_child("items");
                                     item_row.custom_item_index=r.message.item_index;
@@ -182,20 +182,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                 console.log("dissdsdd",pp_after_disc_cal)
                                 let cu_mrp=0
-                                if (r.message.custom_mrp) {
-                                    if (r.message.custom_mrp > 0) {
-                                        cu_mrp = r.message.custom_mrp;
-                                    } else {
-                                        if (pp_after_disc_cal <= 0) {
-                                            cu_mrp = r.message.rate;
-                                        }
-                                        if (pp_after_disc_cal > 0) {
-                                            cu_mrp = pp_after_disc_cal;
-                                        }
-                                    }
-                                
-                                    
-                                }
+                                {if(flt(r.message.custom_mrp)<=0){cu_mrp=flt(r.message.rate)}}
                                 
                                 console.log('[cu mrp]',cu_mrp)
                                 console.log(r.message, "r.message-------------");
@@ -370,13 +357,14 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
 
 // ------------------helper function to calculate ppmu------------------
 function calculatePPMU(d,cdt, cdn) {
-    // let d = locals[cdt][cdn];
         if (!d.custom_percentage) {
             frappe.model.set_value(cdt, cdn, 'custom_ppmumrpdap', '');
             frappe.throw("Please first apply percentage for item");
         } else {
             // Calculate the initial LRP value
-            let lrpValue = flt(d.custom_percentage / 100) + flt(d.rate);
+            let markup=d.rate*d.custom_percentage/100
+            console.log('markup',markup)
+            let lrpValue = flt(d.rate) + flt(markup)
             console.log('LRP value before converting PPMU:', lrpValue);
 
             // Ensure lrpValue is an integer

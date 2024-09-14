@@ -12,6 +12,7 @@ def safe_float_conversion(rate, default_value=0.0):
         return default_value
 @frappe.whitelist()
 def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,disc3, disc, gst, mrp, lrp, brand, group, category, sub_category,item_index):
+	frappe.log_error("Mrp",mrp)
 	frappe.log_error(f"{disc1}-{disc2}-{disc3}-{disc}")
 	doc = json.loads(doc)
 	dict_itm = {}
@@ -132,7 +133,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 
 			# update multiple values
 			frappe.db.set_value('Item',item_code_exist, {
-				'custom_mrp':safe_float_conversion(mrp),
+				'custom_mrp':safe_float_conversion(str(mrp)),
 				'gst_hsn_code':hsn,
 				'custom_luckybee_brand':new_brand,
 				'brand':new_brand,
@@ -141,7 +142,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				'custom_category_sub':sub_category,
 				'custom_barcode':item_code_exist,
 				'custom_last_supplier':doc['supplier'],
-				'custom_last_supplier_purchase_rate':safe_float_conversion(rate)
+				'custom_last_supplier_purchase_rate':safe_float_conversion(str(rate))
 
 			})
 			
@@ -162,7 +163,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_last_supplier=doc['supplier']
-			item.custom_last_supplier_purchase_rate=safe_float_conversion(rate)
+			item.custom_last_supplier_purchase_rate=safe_float_conversion(str(rate))
 			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
 			# item.append('custom_supplier_history',{'supplier':doc['supplier'],'rate':float(rate)})
 			if brand=='ASSR':
@@ -217,7 +218,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 							"item_name": description,
 							"uom": per,
 							"rate": rate,
-							"amount": int(qty)*safe_float_conversion(rate),
+							"amount": int(qty)*safe_float_conversion(str(rate)),
 							"last_purchase_rate":last_purchase_rate,
 							"last_purchase_rate":last_purchase_rate,
 							"custom_mrp":mrp,
