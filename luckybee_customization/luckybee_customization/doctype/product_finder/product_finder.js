@@ -66,14 +66,13 @@ frappe.ui.form.on('Product Finder', {
 				// freeze the screen until the request is completed
 				freeze: true,
 				callback: (r) => {
-					// on success
-					console.log(r.message.item_name,"lll")
-					// cur_frm.save()
-					frappe.set_route('Form','Item',r.message.item_name)
-					window.location.reload()
+					// Delay setting the route by 5 seconds
+					setTimeout(() => {
+						frappe.set_route('Form', 'Item', r.message.item_name);
+						window.location.reload();
+					}, 5000);
 				},
 				error: (r) => {
-					// on error
 				}
 			})
             }

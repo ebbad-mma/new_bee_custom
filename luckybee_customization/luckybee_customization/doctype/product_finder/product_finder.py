@@ -51,6 +51,7 @@ class ProductFinder(Document):
 
 		if self.title:  # If title is provided
 			result = jumble_string_by_word_subsets(self.title)  # Generate title subsets
+			result.insert(0,self.title)
 			frappe.log_error("result", result)
 			for title in result:
 				frappe.log_error("title", title)
@@ -70,7 +71,7 @@ class ProductFinder(Document):
 					frappe.log_error("re", asins)
 					asins_found = True  # Set flag to True when ASINs are found
 					break  # Exit the loop if ASINs are found
-		else:  # If title is not provided
+		else:
 			# Use only other search fields
 			if self.brand:
 				product_params['brand'] = [self.brand]
@@ -92,6 +93,7 @@ class ProductFinder(Document):
 			
 			for item in products:
 				try:
+					brand=item['brand']
 					image_url = ProductFinder.image_url + item['imagesCSV'].split(',')[0]
 					list_price = item.get('stats_parsed', {}).get('avg90', {}).get('LISTPRICE', 0)
 					new_current = item.get('stats_parsed', {}).get('current', {}).get('NEW', 0)
@@ -111,7 +113,8 @@ class ProductFinder(Document):
 						'size': item['size'],
 						'mrp': list_price,
 						'online_price': new_current,
-						'discount': discount_percentage
+						'discount': discount_percentage,
+						'brand': brand
 					})
 
 				except Exception as e:

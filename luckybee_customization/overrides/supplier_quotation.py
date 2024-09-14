@@ -10,6 +10,21 @@ def safe_float_conversion(rate, default_value=0.0):
         frappe.msgprint(f"Could not convert rate '{rate}' to float.")
         return default_value
 
+#HELPER FUNCTION TO SET IDX IN TOTAL MARGIN TABLE IN DESC ORDER
+def set_idx_in_total_margin_desc(po_name):
+	# Initialize the row number variable
+	frappe.db.sql("SET @row_number := 0")
+
+	# Update the `idx` field based on the `modified` date in descending order
+	frappe.db.sql("""
+		UPDATE `tabDecision Maker` 
+		SET `idx` = (@row_number := @row_number + 1)
+		WHERE `parent` = %s 
+		AND `parenttype` = 'Supplier Quotation'
+		ORDER BY `margin_` Desc
+	""", (po_name,))
+
+
 @frappe.whitelist()
 def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,disc3, disc, mrp, brand, group, category, sub_category,custom_asin,custom_box_number,custom_ean,custom_synced,amount,item_index):
 	doc = json.loads(doc)
@@ -185,6 +200,7 @@ def get_total_margin(sq_items, name):
 			parent_doc.append('custom_decision_maker',margin)
 		# Save the parent document
 		parent_doc.save()
+		set_idx_in_total_margin_desc(name)
 
 		return {'status': 'success', 'message': 'Margin details updated successfully'}
 

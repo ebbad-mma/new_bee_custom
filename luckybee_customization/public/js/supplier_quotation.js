@@ -43,7 +43,12 @@ frappe.ui.form.on('Supplier Quotation', {
                             if (r.message.item_code) {
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                 let cu_mrp=0
-                                if(flt(r.message.mrp)<=0){cu_mrp=flt(r.message.rate)}
+                                if (flt(r.message.mrp) <= 0) {
+                                    cu_mrp = flt(r.message.rate);
+                                } else {
+                                    cu_mrp = flt(r.message.mrp);
+                                }
+                                
                                 
                                 console.log("r message",r)
                                 var item_row = cur_frm.add_child("items");

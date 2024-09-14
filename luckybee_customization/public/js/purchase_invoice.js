@@ -58,7 +58,11 @@ frappe.ui.form.on('Purchase Invoice', {
                                 if (r.message) {
                                     let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                     let cu_mrp=0
-                                    if(flt(r.message.mrp)<=0){cu_mrp=flt(r.message.rate)}
+                                    if (flt(r.message.mrp) <= 0) {
+                                        cu_mrp = flt(r.message.rate);
+                                    } else {
+                                        cu_mrp = flt(r.message.mrp);
+                                    }
                                     console.log("R MESSAGE",r.message)
                                     var item_row = cur_frm.add_child("items");
                                     item_row.custom_item_index=r.message.item_index;
@@ -182,7 +186,11 @@ frappe.ui.form.on('Purchase Invoice', {
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                 console.log("dissdsdd",pp_after_disc_cal)
                                 let cu_mrp=0
-                                {if(flt(r.message.custom_mrp)<=0){cu_mrp=flt(r.message.rate)}}
+                                if (flt(r.message.custom_mrp) <= 0) {
+                                    cu_mrp = flt(r.message.rate);
+                                } else {
+                                    cu_mrp = flt(r.message.custom_mrp);
+                                }
                                 
                                 console.log('[cu mrp]',cu_mrp)
                                 console.log(r.message, "r.message-------------");
