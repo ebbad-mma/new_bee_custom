@@ -1,0 +1,37 @@
+{
+ "cards": [],
+ "charts": [
+  {
+   "chart": "Total Sales By Category",
+   "width": "Full"
+  },
+  {
+   "chart": "Total Purchase By Category",
+   "width": "Full"
+  },
+  {
+   "chart": "Top 10 Customers",
+   "width": "Full"
+  },
+  {
+   "chart": "Top 10 Products",
+   "width": "Full"
+  },
+  {
+   "chart": "Total Sales By Payment Mode",
+   "width": "Half"
+  }
+ ],
+ "creation": "2024-09-14 18:10:40.766223",
+ "dashboard_name": "Luckybee Dashboard",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2024-09-16 16:07:41.872090",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Luckybee Dashboard",
+ "owner": "Administrator"
+}

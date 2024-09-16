@@ -1,0 +1,23 @@
+
+
+frappe.query_reports["Sales By Payment Mode"] = {
+	"filters": [
+
+		{
+			'label':'From Date',
+			'fieldname':'from_date',
+			'fieldtype':'Date',
+			"reqd": 1,                 
+			'width':80
+		},
+		{
+			'label':'To Date',
+			'fieldname':'to_date',
+			'fieldtype':'Date',
+			"reqd": 1,
+			'width':80
+		}
+
+
+	]
+};

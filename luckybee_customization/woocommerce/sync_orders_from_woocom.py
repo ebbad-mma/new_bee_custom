@@ -6,6 +6,8 @@ from luckybee_customization.woocommerce.update_webhook_status import update_webh
 from luckybee_customization.woocommerce.publish_item import get_woocommerce_settings
 from frappe import _
 
+
+#luckybe pass=Erp@123#456
 #find customer by email or phone
 def customer_by_email_or_phone(email,phone):
 	settings = get_woocommerce_settings()
@@ -22,7 +24,7 @@ def customer_by_email_or_phone(email,phone):
 		wp_api=True,
 		version="wc/v3",
 		timeout=1000
-	)
+	)	
 	if email is not None:
 		response = wcapi.get(f"customers?email={email}").json()
 	else:
@@ -116,6 +118,7 @@ def get_orders():
 			payment_method = response.get('payment_method')
 			if payment_method=='cod':
 				sales_order.custom_payment_method ='Cash'
+				# sales_order.append('Payments',{'mode_of_payment':'Cash','amount':})
 
 			for item_details in response['line_items']:
 				try:
