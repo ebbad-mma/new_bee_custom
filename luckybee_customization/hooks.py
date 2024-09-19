@@ -251,11 +251,11 @@ doc_events = {"Item": {
         },
         "Purchase Order": {
 		"on_submit": "luckybee_customization.overrides.purchase_order.remove_unselected_item_from_item_master"
-        },
-        "Branch": {
-		"validate": "luckybee_customization.woocommerce.test.test"
-		# "validate": "luckybee_customization.woocommerce.test2.test"
         }
+        # "Branch": {
+		# "validate": "luckybee_customization.woocommerce.test.test"
+		# # "validate": "luckybee_customization.woocommerce.test2.test"
+        # }
     }
 
 

@@ -119,6 +119,8 @@ def get_orders():
 			if payment_method=='cod':
 				sales_order.custom_payment_method ='Cash'
 				# sales_order.append('Payments',{'mode_of_payment':'Cash','amount':})
+			elif payment_method=='razorpay':
+				pass
 
 			for item_details in response['line_items']:
 				try:

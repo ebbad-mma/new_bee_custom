@@ -2,6 +2,15 @@
 
 frappe.ui.form.on('Item', {
     refresh(frm){
+        // #call function to sort supplier history 
+        sort_supplier_history_desc(frm) 
+
+        // #hide index in supplier history because we are sorting on refresh 
+        $(document).ready(function() {
+            // Hide the div with the class 'row-check sortable-handle col'
+            $('.row-index.sortable-handle.col').hide();
+        });
+        
         $("button:contains('Actions')").hide();
         $("button:contains('Duplicate')").hide();
         // Check if the custom_item_detail field has a value
@@ -121,4 +130,19 @@ frappe.ui.form.on('Item', {
     }
 })
 
+
+
+
+// #helper function to show latest supplier in first 
+function sort_supplier_history_desc(frm) {
+    if (frm.doc.custom_supplier_history && frm.doc.custom_supplier_history.length > 0) {
+        // Sort the child table rows by the modified date in descending order
+        frm.doc.custom_supplier_history.sort((a, b) => {
+            return new Date(b.creation) - new Date(a.creation);
+        });
+
+        // Refresh the field to reflect the sorted rows
+        frm.refresh_field('custom_supplier_history');
+    }
+}
 
