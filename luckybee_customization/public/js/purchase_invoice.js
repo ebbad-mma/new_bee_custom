@@ -644,3 +644,43 @@ function pp_after_disc(rate, disc1, disc2, disc3) {
 
     return finalRate.toFixed(2); // Return the final rate rounded to two decimal places
 }
+
+
+
+
+// ----------------------------apply mrp on selected items---------------------
+frappe.ui.form.on('Purchase Invoice', {
+    custom_apply_mrp: function(frm,cdt,cdn) {
+        let selected = frm.get_selected();
+
+        console.log("Selected items:", selected.items);
+
+        if (!frm.doc.custom_mrp_multiplier) {
+            frappe.throw("Please first apply MRP and select items");
+        } else if (!selected.items || selected.items.length === 0) {
+            frappe.throw("Please select items to apply MRP");
+        } else {
+            let row_info=selected.items.map(item => {
+                let row = locals['Purchase Invoice Item'][item];
+                // Multiply the custom MRP by the multiplier
+                row.custom_mrp = row.custom_mrp * frm.doc.custom_mrp_multiplier; 
+
+                // Check the condition for applying different formulas
+                if (row.custom_ppmumrpdap === "PPMU") {
+                    // frappe.model.set_value(cdt, cdn, 'custom_mrp', custom_mrp);
+                    frm.refresh_field('items');
+                    // frappe.throw("pp")
+                    // calculatePPMU(d,cdt, cdn)
+                    console.log(row.custom_mrp)
+                } else if (row.custom_ppmumrpdap === "MRPD") {
+                    // Call your MRPD calculation function here
+                    calculateMRPD(item);
+                }
+            });
+
+            // Refresh the form to show updated values
+            frm.refresh_field('items'); // Assuming 'items' is the child table name
+        }
+    }
+});
+
