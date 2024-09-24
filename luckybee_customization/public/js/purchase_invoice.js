@@ -664,22 +664,100 @@ frappe.ui.form.on('Purchase Invoice', {
                 let row = locals['Purchase Invoice Item'][item];
                 // Multiply the custom MRP by the multiplier
                 row.custom_mrp = row.custom_mrp * frm.doc.custom_mrp_multiplier; 
-
+                frm.refresh_field('items');
                 // Check the condition for applying different formulas
                 if (row.custom_ppmumrpdap === "PPMU") {
-                    // frappe.model.set_value(cdt, cdn, 'custom_mrp', custom_mrp);
+                    let markup=row.rate*row.custom_percentage/100
+                    let lrpValue = flt(row.rate) + flt(markup)
+                    console.log('LRP value before converting PPMU:', lrpValue);
+        
+                    // Ensure lrpValue is an integer
+                    lrpValue = Math.floor(lrpValue);
+        
+                    // Adjust lrpValue to end with 9
+                    if (lrpValue % 10 !== 9) {
+                        lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                    }
+                    console.log('LRP value after converting PPMU:', lrpValue);
+        
+                    let discount_on_mrp = row.custom_mrp - lrpValue;
+                    let dis = (discount_on_mrp * 100) / row.custom_mrp;
+                    let custom_discount = Math.round(dis);
+        
+                    // If the discount is less than 15%, adjust the LRP to give a 15% discount
+                    console.log("Custom discount:", custom_discount);
+                    if (custom_discount < 15) {
+                        console.log("Discount is less than 15%");
+                        lrpValue = Math.floor(row.custom_mrp * 0.85);
+        
+                        // Adjust lrpValue to end with 9
+                        if (lrpValue % 10 !== 9) {
+                            if (row.rate<=200){lrpValue=lrpValue}
+                            else{lrpValue = Math.floor(lrpValue / 10) * 10 + 9;}
+                            
+                        }
+        
+                        // Recalculate the discount after adjusting lrpValue
+                        discount_on_mrp = row.custom_mrp - lrpValue;
+                        dis = (discount_on_mrp * 100) / row.custom_mrp;
+                        custom_discount = Math.round(dis);
+                        console.log("Custom discount after adjustment:", custom_discount);
+                    }
+        
+                    // Update values in the Frappe model
+                    row.custom_lrp=lrpValue
+                    row.custom_discount=custom_discount
+                    row.custom_margin=row.custom_percentage
                     frm.refresh_field('items');
-                    // frappe.throw("pp")
-                    // calculatePPMU(d,cdt, cdn)
-                    console.log(row.custom_mrp)
-                } else if (row.custom_ppmumrpdap === "MRPD") {
-                    // Call your MRPD calculation function here
-                    calculateMRPD(item);
+
+                }
+
+                else if (row.custom_ppmumrpdap === "MRPD") {
+                   console.log("MRPD")
+                    let discount = (flt(row.custom_mrp) * flt(row.custom_percentage) / 100);
+                    let lrpValue = row.custom_mrp - discount;
+                    console.log("LRP before adjustment:", lrpValue);
+            
+                    // Ensure lrpValue is an integer and ends with 9
+                    lrpValue = Math.floor(lrpValue);
+                    if (lrpValue % 10 !== 9) {
+                        lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                    }
+                    console.log("LRP after adjustment to end with 9:", lrpValue);
+            
+                    let discount_on_mrp = row.custom_mrp - lrpValue;
+                    let dis = (discount_on_mrp * 100) / row.custom_mrp;
+                    let custom_discount = Math.round(dis);
+            
+                    // If the discount is less than 15%, adjust the LRP to give a 15% discount
+                    if (custom_discount < 15) {
+                        lrpValue = Math.floor(row.custom_mrp * 0.85);
+            
+                        // Ensure lrpValue ends with 9
+                        if (lrpValue % 10 !== 9) {
+                            if (row.rate<=200){lrpValue=lrpValue}
+                            else{lrpValue = Math.floor(lrpValue / 10) * 10 + 9;}
+                            
+                        }
+            
+                        // Recalculate the discount after adjusting lrpValue
+                        discount_on_mrp = row.custom_mrp - lrpValue;
+                        dis = (discount_on_mrp * 100) / row.custom_mrp;
+                        custom_discount = Math.round(dis);
+                    }
+            
+                    // Calculate margin
+                    let discount_on_margin = lrpValue - row.rate;
+                    let margin = (discount_on_margin / row.rate) * 100;
+                    // Update values in the Frappe model
+                    row.custom_lrp=lrpValue
+                    row.custom_discount=custom_discount
+                    row.custom_margin=margin
+                    frm.refresh_field('items');
+                
                 }
             });
 
-            // Refresh the form to show updated values
-            frm.refresh_field('items'); // Assuming 'items' is the child table name
         }
     }
 });
