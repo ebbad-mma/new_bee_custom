@@ -1,42 +1,64 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+/* home page design */
+/* 
+.search-container{
+  position: relative;
+}
+
+.prev-btn{
+position: absolute;
+} */
+
+.container-1 {
+  padding: 10px !important;
+}
+
+.form-label {
   text-align: center;
+  padding: 10px;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.search-container-1 input {
+  margin: 10px;
+
+  max-width: 280px;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.save-container {
+  display: flex;
+  justify-content: space-around;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.save-container .save-btn {
+  width: 100px !important;
 }
 
-.card {
-  padding: 2em;
+.left-btn svg,
+.right-btn svg {
+  font-size: 1.5rem;
+  width: 30px;
+  height: 30px;
+  color: green;
+
+  padding: 2px;
+  cursor: pointer;
 }
 
-.read-the-docs {
-  color: #888;
+.search-btn-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  /* padding:20px; */
+}
+
+.search-btn-container .search-btn {
+
+  width: 150px !important;
+
+
+}
+
+.search-btn-container .search-btn,
+.left-btn {
+  width: 30px;
+
 }

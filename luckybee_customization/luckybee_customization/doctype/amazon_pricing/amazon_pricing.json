@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-10-04 16:15:35.134942",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "lower_purchase_price_as__of_online_price",
+  "upper_purchase_price_as__of_online_price",
+  "range_purchase_price_as__of_online_price",
+  "rating_2",
+  "rating_3",
+  "rating_4",
+  "rating_5"
+ ],
+ "fields": [
+  {
+   "fieldname": "lower_purchase_price_as__of_online_price",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Lower Purchase Price as % of Online Price",
+   "precision": "0"
+  },
+  {
+   "fieldname": "upper_purchase_price_as__of_online_price",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Upper Purchase Price as % of Online Price",
+   "precision": "0"
+  },
+  {
+   "fieldname": "rating_2",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "<=2",
+   "precision": "0"
+  },
+  {
+   "fieldname": "rating_3",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": ">2 & <=3",
+   "precision": "0"
+  },
+  {
+   "fieldname": "rating_4",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": ">3 & <=4",
+   "precision": "0"
+  },
+  {
+   "fieldname": "rating_5",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": ">4 & <=5",
+   "precision": "0"
+  },
+  {
+   "fieldname": "range_purchase_price_as__of_online_price",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Range Purchase Price as % of Online Price"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-10-07 12:19:21.622072",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Amazon Pricing",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

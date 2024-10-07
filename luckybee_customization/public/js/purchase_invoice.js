@@ -182,6 +182,11 @@ frappe.ui.form.on('Purchase Invoice', {
                             console.log(r.message, "r.message-------------");
                             console.log("Item Index",r.message.item_index)
                             if (r.message) {
+                                // CREATE GROUP 
+                            check_and_create_item_group(r.message.group);
+                            console.log(r.message.group)
+
+
                                 console.log("custsttsts0",r.message.custom_mrp)
                                 let pp_after_disc_cal=pp_after_disc(r.message.rate, r.message.disc1,r.message.disc2, r.message.disc3)
                                 console.log("dissdsdd",pp_after_disc_cal)
@@ -210,6 +215,9 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.item_tax_template=r.message.gst_template; 
                                 item_row.custom_item_index=r.message.item_index; 
                                 item_row.idx=r.message.item_index; 
+                                item_row.custom_category=r.message.category; 
+                                item_row.custom_subcategory=r.message.sub_category; 
+                                item_row.group=r.message.group; 
 
                                 cur_frm.refresh_fields("items");
                                 for (let item of frm.doc.custom_custom_purchase_item) {
@@ -761,4 +769,33 @@ frappe.ui.form.on('Purchase Invoice', {
         }
     }
 });
+
+// ------------------------HELPER FUNCTION TO CRATE ITEM GROUP---------------- 
+function check_and_create_item_group(groupName) {
+    // Check if the item group exists
+    frappe.db.get_value('Item Group', {'item_group_name': groupName}, 'name', (r) => {
+        if (!r.name) {
+            // Create the item group if it doesn't exist
+            frappe.call({
+                method: "frappe.client.insert",
+                args: {
+                    doc: {
+                        doctype: "Item Group",
+                        item_group_name: groupName,
+                        parent_item_group: "All Item Groups",
+                        is_group: 0
+                    }
+                },
+                callback: function(response) {
+                    if (response.message) {
+                        console.log(`Item Group "${groupName}" created successfully!`);
+                    }
+                }
+            });
+        } else {
+            console.log(`Item Group "${groupName}" already exists.`);
+        }
+    });
+}
+
 

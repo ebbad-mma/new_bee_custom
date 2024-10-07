@@ -204,7 +204,10 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 							"disc2":disc2,
 							"disc3":disc3,
 							"gst_template":gst,
-							"item_index":int(item_index)
+							"item_index":int(item_index),
+							"group":group,
+							"category":category,
+							"sub_category":sub_category
 						})
 		frappe.log_error("dict",dict_itm)
 		return dict_itm
