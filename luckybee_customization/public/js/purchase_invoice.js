@@ -267,108 +267,149 @@ frappe.ui.form.on('Purchase Invoice', {
 // ------------for amazon price rule-----------------------
 
 function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
-    console.log(d,"--------------d")
-    let result=0;
-    console.log("Result",result)
-    console.log("custom_asp",d.custom_asp)
-    console.log("custom_avg_30",d.custom_avg_30)
-    console.log("custom_avg_90",d.custom_avg_90)
+    console.log("data", d);
+    let result = 0;
+
+    // Determine result based on custom ASP, AVG 30, or AVG 90
     if (d.custom_asp > 0) {
         result = d.custom_asp;
-    } else if(d.custom_avg_30 > 0){
-        result = d.custom_avg_30 ;
+    } else if (d.custom_avg_30 > 0) {
+        result = d.custom_avg_30;
+    } else if (d.custom_avg_90 > 0) {
+        result = d.custom_avg_90;
+    } else {
+        result = 0;
     }
-    else if(d.custom_avg_90>0){result = d.custom_avg_90 ;}
-    else{result=0}
-    console.log("final Result",result)
-    if(result>0){
-    let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) /result) * 100;
-    console.log("purchase_price_as_percent_of_online_price",purchase_price_as_percent_of_online_price)
-    let discountPercentage = 0;
 
-    if (d.custom_reviews_count > 50) {
-        console.log("gratear than 50")
-        if (purchase_price_as_percent_of_online_price > 5 && purchase_price_as_percent_of_online_price <= 20) {
-            console.log("5 and 20")
-            discountPercentage =parseFloat(d.custom_reviewsrating) <= 2 ? 45 : (parseFloat(d.custom_reviewsrating) <= 3 ? 55 : (parseFloat(d.custom_reviewsrating) <= 4 ? 60 : 65));
-        }  else if (purchase_price_as_percent_of_online_price > 20 && purchase_price_as_percent_of_online_price <= 30) {
-            console.log("20 and 30")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 50 : (parseFloat(d.custom_reviewsrating) <= 3 ? 55 : (parseFloat(d.custom_reviewsrating) <= 4 ? 65 : 70));
-        } else if  (purchase_price_as_percent_of_online_price > 30 && purchase_price_as_percent_of_online_price <= 40) {
-            console.log("30 and 40")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 60 : (parseFloat(d.custom_reviewsrating) <= 3 ? 65 : (parseFloat(d.custom_reviewsrating) <= 4 ? 70 : 75));
-        } else if (purchase_price_as_percent_of_online_price > 40 && purchase_price_as_percent_of_online_price <= 50) {
-            console.log("40 and 50")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 65 : (parseFloat(d.custom_reviewsrating) <= 3 ? 70 : (parseFloat(d.custom_reviewsrating) <= 4 ? 75 : 80));
-        } else if (purchase_price_as_percent_of_online_price > 50 && purchase_price_as_percent_of_online_price <= 60) {
-            console.log("50 and 60")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 70 : (parseFloat(d.custom_reviewsrating) <= 3 ? 75 : (parseFloat(d.custom_reviewsrating) <= 4 ? 80 : 85));
-        } else if (purchase_price_as_percent_of_online_price > 60 && purchase_price_as_percent_of_online_price <= 70) {
-            console.log("60 and 70")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 80 : (parseFloat(d.custom_reviewsrating) <= 3 ? 80 : (parseFloat(d.custom_reviewsrating) <= 4 ? 85 : 85));
-        } else if (purchase_price_as_percent_of_online_price > 70 && purchase_price_as_percent_of_online_price <= 80)  {
-            console.log("70 and 80")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 80 : (parseFloat(d.custom_reviewsrating) <= 3 ? 85 : (parseFloat(d.custom_reviewsrating) <= 4 ? 90 : 90));
-        } else if (purchase_price_as_percent_of_online_price > 80 && purchase_price_as_percent_of_online_price <= 90) {
-            console.log("80 and 90")
-            discountPercentage = parseFloat(d.custom_reviewsrating) <= 2 ? 90 : (parseFloat(d.custom_reviewsrating) <= 3 ? 90 : (parseFloat(d.custom_reviewsrating) <= 4 ? 95 : 95));
-        } else {
-            discountPercentage = 100;
-        }
-    } 
-    else if(d.custom_reviews_count <=50){
-        console.log("hhhahahhhahahahahahhahahah")
-        if (purchase_price_as_percent_of_online_price > 5 && purchase_price_as_percent_of_online_price <= 20) {
-            discountPercentage = 55;
-        } else if (purchase_price_as_percent_of_online_price > 20 && purchase_price_as_percent_of_online_price <= 30) {
-            discountPercentage = 55;
-        } else if (purchase_price_as_percent_of_online_price > 30 && purchase_price_as_percent_of_online_price <= 40) {
-            discountPercentage = 65;
-        } else if (purchase_price_as_percent_of_online_price > 40 && purchase_price_as_percent_of_online_price <= 50) {
-            discountPercentage = 70;
-        } else if (purchase_price_as_percent_of_online_price > 50 && purchase_price_as_percent_of_online_price <= 60) {
-            discountPercentage = 75;
-        } else if (purchase_price_as_percent_of_online_price > 60 && purchase_price_as_percent_of_online_price <= 70) {
-            discountPercentage = 80;
-        } else if (purchase_price_as_percent_of_online_price > 70 && purchase_price_as_percent_of_online_price <= 80){
-            discountPercentage = 85;
-        } else if (purchase_price_as_percent_of_online_price > 80 && purchase_price_as_percent_of_online_price <= 90){
-            discountPercentage = 90;
-        } else {
-            discountPercentage = 100;
-        }
+    if (result > 0) {
+        console.log("RES", `${d.rate},${result}`);
+        let purchase_price_as_percent_of_online_price = (parseFloat(d.rate) / result) * 100;
+
+        // GET AMAZON PRICE RULE DOCTYPE
+        frappe.db.get_doc('Amazon Pricing Rule')
+            .then(doc => {
+                let discountPercentage = 0;
+                const reviews = d.custom_reviews_count;
+                const ratings = d.custom_reviewsrating;
+
+                // Check if reviews are greater than 50
+                if (reviews > 50) {
+                    console.log("reviews are greater than 50");
+
+                    // Iterate through the child table entries
+                    for (let pricing of doc.amazon_pricing) {
+                        const { lower_purchase_price_as__of_online_price, upper_purchase_price_as__of_online_price } = pricing;
+                        console.log("pp", lower_purchase_price_as__of_online_price);
+
+                        // Check if purchase_price_as_percent_of_online_price falls within the range
+                        if (purchase_price_as_percent_of_online_price > lower_purchase_price_as__of_online_price &&
+                            purchase_price_as_percent_of_online_price <= upper_purchase_price_as__of_online_price) {
+                            console.log("Range between:",
+                                `${purchase_price_as_percent_of_online_price}, ${lower_purchase_price_as__of_online_price}, ${upper_purchase_price_as__of_online_price}`);
+                            console.log("ratings", ratings);
+
+                            // Determine discount percentage based on ratings
+                            if (ratings <= 2) {
+                                console.log("rating is less than or equal to 2");
+                                discountPercentage = pricing.rating_2;
+                            } else if (ratings > 2 && ratings <= 3) {
+                                console.log("rating is less than or equal to 3");
+                                discountPercentage = pricing.rating_3;
+                            } else if (ratings > 3 && ratings <= 4) {
+                                console.log("rating is less than or equal to 4");
+                                discountPercentage = pricing.rating_4;
+                            } else if (ratings > 4 && ratings <= 5) {
+                                console.log("rating is greater than or equal to 5");
+                                discountPercentage = pricing.rating_5;
+                            }
+
+                            // Log or return the discount percentage
+                            console.log(`Discount Percentage: ${discountPercentage}`);
+                            let lrpValue = (result * discountPercentage) / 100;
+                            console.log("Lrp before converting in 9", lrpValue);
+
+                            // Ensure lrpValue is an integer
+                            lrpValue = Math.floor(lrpValue);
+
+                            // Adjust lrpValue to end with 9
+                            if (lrpValue % 10 !== 9) {
+                                lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                            }
+
+                            let discount_on_margin = lrpValue - d.rate;
+                            let margin = (discount_on_margin / d.rate * 100);
+                            let discount_on_mrp = result - lrpValue;
+                            let dis = (discount_on_mrp * 100) / result;
+                            let custom_discount = Math.round(dis / 10) * 10;
+                            console.log("lrp after conversion", lrpValue);
+
+                            // Set calculated values in the form
+                            d.custom_lrp = lrpValue;
+                            d.custom_percentage = discountPercentage;
+                            d.custom_margin = margin;
+                            d.custom_discount = custom_discount;
+
+                            // Refresh the field if necessary
+                            frm.refresh_field('items');
+                            break;
+                        }
+                    }
+                } else {
+                    console.log("Reviews are less than or equal to 50");
+
+                    for (let pricing of doc.amazon_pricing) {
+                        const { lower_purchase_price_as__of_online_price, upper_purchase_price_as__of_online_price } = pricing;
+                        console.log("pp", lower_purchase_price_as__of_online_price);
+
+                        // Check if purchase_price_as_percent_of_online_price falls within the range
+                        if (purchase_price_as_percent_of_online_price > lower_purchase_price_as__of_online_price &&
+                            purchase_price_as_percent_of_online_price <= upper_purchase_price_as__of_online_price) {
+                            console.log("Range between:",
+                                `${purchase_price_as_percent_of_online_price}, ${lower_purchase_price_as__of_online_price}, ${upper_purchase_price_as__of_online_price}`);
+                            console.log("ratings", ratings);
+
+                            // Default discount percentage for low reviews
+                            discountPercentage = pricing.rating_3;
+
+                            // Log or return the discount percentage
+                            console.log(`Discount Percentage: ${discountPercentage}`);
+                            let lrpValue = (result * discountPercentage) / 100;
+                            console.log("Lrp before converting in 9", lrpValue);
+
+                            // Ensure lrpValue is an integer
+                            lrpValue = Math.floor(lrpValue);
+
+                            // Adjust lrpValue to end with 9
+                            if (lrpValue % 10 !== 9) {
+                                lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
+                            }
+
+                            let discount_on_margin = lrpValue - d.rate;
+                            let margin = (discount_on_margin / d.rate * 100);
+                            let discount_on_mrp = result - lrpValue;
+                            let dis = (discount_on_mrp * 100) / result;
+                            let custom_discount = Math.round(dis / 10) * 10;
+                            console.log("lrp after conversion", lrpValue);
+
+                            // Set calculated values in the form
+                            d.custom_lrp = lrpValue;
+                            d.custom_percentage = discountPercentage;
+                            d.custom_margin = margin;
+                            d.custom_discount = custom_discount;
+
+                            // Refresh the field if necessary
+                            frm.refresh_field('items');
+                            break;
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching Amazon Pricing Rule:", error);
+            });
     }
-    
+}
 
-    let lrpValue = (result * discountPercentage) / 100;
-    console.log(discountPercentage,"appp")
-    console.log("pehle wale lrp",lrpValue)
-
-        // Ensure lrpValue is an integer
-        lrpValue = Math.floor(lrpValue);
-        
-        // Adjust lrpValue to end with 9
-        if (lrpValue % 10 !== 9) {
-            lrpValue = Math.floor(lrpValue / 10) * 10 + 9;
-    }
-    let discount_on_margin=lrpValue-d.rate
-    let margin=(discount_on_margin/d.rate*100)
-    let discount_on_mrp = result - lrpValue;
-    let dis = (discount_on_mrp * 100) / result;
-    let custom_discount = Math.round(dis / 10) * 10;
-    // frappe.model.set_value(cdt, cdn, 'custom_discount', custom_discount);
-   
-    
-    console.log("lrpvaluenenwewe",lrpValue)
-   
-    d.custom_lrp=lrpValue
-    d.custom_percentage=discountPercentage
-    d.custom_margin=margin
-    d.custom_discount=custom_discount
-
-    // Refresh the field if necessary
-    frm.refresh_field('items');
-}}
 
 
 // ------------------helper function to calculate ppmu------------------
