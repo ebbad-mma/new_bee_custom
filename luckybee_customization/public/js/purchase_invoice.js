@@ -367,9 +367,17 @@ function calculate_lrp_and_apply_discount(frm, cdt, cdn, d) {
                             console.log("Range between:",
                                 `${purchase_price_as_percent_of_online_price}, ${lower_purchase_price_as__of_online_price}, ${upper_purchase_price_as__of_online_price}`);
                             console.log("ratings", ratings);
-
-                            // Default discount percentage for low reviews
-                            discountPercentage = pricing.rating_3;
+                            console.log("discount_for_less_than_50_reviews",doc.discount_for_less_than_50_reviews)
+                            if (doc.discount_for_less_than_50_reviews == '<=2') {
+                                discountPercentage = pricing.rating_2;
+                            } else if (doc.discount_for_less_than_50_reviews == '>=2 & <=3') {
+                                discountPercentage = pricing.rating_3;
+                            } else if (doc.discount_for_less_than_50_reviews == '>=3 & <=4') {
+                                discountPercentage = pricing.rating_4;
+                            } else if (doc.discount_for_less_than_50_reviews == '>=4 & <=5') {
+                                discountPercentage = pricing.rating_5;
+                            }
+                            
 
                             // Log or return the discount percentage
                             console.log(`Discount Percentage: ${discountPercentage}`);
@@ -712,7 +720,9 @@ frappe.ui.form.on('Purchase Invoice', {
             let row_info=selected.items.map(item => {
                 let row = locals['Purchase Invoice Item'][item];
                 // Multiply the custom MRP by the multiplier
-                row.custom_mrp = row.custom_mrp * frm.doc.custom_mrp_multiplier; 
+                let mrp_percentage=(frm.doc.custom_mrp_multiplier*row.custom_mrp)/100
+                console.log("mrp perc",mrp_percentage)
+                row.custom_mrp = row.custom_mrp + mrp_percentage; 
                 frm.refresh_field('items');
                 // Check the condition for applying different formulas
                 if (row.custom_ppmumrpdap === "PPMU") {

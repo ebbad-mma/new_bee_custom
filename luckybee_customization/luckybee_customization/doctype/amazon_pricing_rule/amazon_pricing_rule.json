@@ -7,7 +7,10 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "amazon_pricing"
+  "description",
+  "discount_for_less_than_50_reviews",
+  "amazon_pricing",
+  "default_amazon_price_rule"
  ],
  "fields": [
   {
@@ -15,12 +18,33 @@
    "fieldtype": "Table",
    "label": "Amazon Pricing",
    "options": "Amazon Pricing"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "description": "Only the percentages from the selected rating column will be applied to the item, where the item's review count is less than 50.",
+   "fieldname": "discount_for_less_than_50_reviews",
+   "fieldtype": "Select",
+   "label": "Discount% for Less than 50 reviews",
+   "options": "<=2\n>=2 & <=3\n>=3 & <=4\n>=4 & <=5"
+  },
+  {
+   "fieldname": "default_amazon_price_rule",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "Default Amazon Price Rule",
+   "options": "Default Amazon Price Rule",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-04 16:19:32.908241",
+ "modified": "2024-10-21 17:58:30.219081",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Amazon Pricing Rule",
