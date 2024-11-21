@@ -279,6 +279,10 @@ fixtures = [
             ]
         ]
     },
+     {
+        "dt": "Amazon Pricing Rule"
+        
+    }
     ]
 # website_route_rules = [{'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'},]
 
