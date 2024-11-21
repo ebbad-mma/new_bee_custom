@@ -27,7 +27,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			uom.insert()
 		#create Brand
 		if brand:
-			if not frappe.db.exists('Brand',{'brand':brand}):
+			if not frappe.db.exists('Brand',brand):
 				br=frappe.new_doc('Brand')
 				br.brand=brand
 				br.insert()
