@@ -6,7 +6,11 @@ def update_stock_in_hand(doc,method=None):
 
 def set_warehouse_and_update_stock(doc,method=None):
     doc.db_set('update_stock',1)
-    doc.db_set('set_warehouse','Finished Goods - SR')
+    default_warehouse=frappe.db.get_single_value('Luckybee Settings','default_warehouse')
+    if default_warehouse:
+        doc.db_set('set_warehouse',default_warehouse)
+    else:
+        frappe.throw("You have not selected any warehouse in Luckybee settings. Please select a warehouse there or in the Purchase Invoice itself.")
 
 
 

@@ -7,19 +7,27 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "amazon_price_rule_password"
+  "amazon_price_rule_password",
+  "default_warehouse"
  ],
  "fields": [
   {
    "fieldname": "amazon_price_rule_password",
    "fieldtype": "Data",
    "label": "Amazon Price Rule Password"
+  },
+  {
+   "description": "Selected Warehouse use to store items after submit of purchase Invoice",
+   "fieldname": "default_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-18 13:32:34.584101",
+ "modified": "2024-11-22 13:00:06.539473",
  "modified_by": "Administrator",
  "module": "luckybee_customization",
  "name": "Luckybee Settings",
