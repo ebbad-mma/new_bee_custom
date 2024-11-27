@@ -236,11 +236,12 @@ scheduler_events = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
-doc_events = {"Item": {
-		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
-		"on_update": "luckybee_customization.overrides.item_utils.check_image"
-        }
-        ,
+doc_events = {
+    # "Item": {
+	# 	"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
+	# 	"on_update": "luckybee_customization.overrides.item_utils.check_image"
+    #     }
+    #     ,
         "Purchase Invoice": {
 		"on_submit": "luckybee_customization.overrides.bin.update_stock_in_hand",
 		"before_submit": "luckybee_customization.overrides.bin.set_warehouse_and_update_stock",
