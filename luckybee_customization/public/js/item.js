@@ -5,6 +5,17 @@ frappe.ui.form.on('Item', {
         // #call function to sort supplier history 
         sort_supplier_history_desc(frm) 
 
+
+        // set parent item group in item
+        set_parent_group(frm)
+
+        // set group category
+        set_category_group(frm)
+
+
+        // set sub category
+        set_sub_category_group(frm)
+
         // #hide index in supplier history because we are sorting on refresh 
         $(document).ready(function() {
             // Hide the div with the class 'row-check sortable-handle col'
@@ -144,5 +155,46 @@ function sort_supplier_history_desc(frm) {
         // Refresh the field to reflect the sorted rows
         frm.refresh_field('custom_supplier_history');
     }
+}
+
+
+
+
+// set filter in  parent group in item
+function set_parent_group(frm) {
+    frm.set_query('item_group', function() {
+        return {
+            filters: {
+                'parent_item_group': '', // No parent
+                'is_group': 1          // Is a group
+            }
+        };
+    });
+}
+
+
+// set filter in  category  group in item
+function set_category_group(frm) {
+    frm.set_query('custom_category', function() {
+        return {
+            filters: {
+                'parent_item_group': ['!=', ''], // No parent
+                'is_group': 1          // Is a group
+            }
+        };
+    });
+}
+
+
+// set filter in  sub category  group in item
+function set_sub_category_group(frm) {
+    frm.set_query('custom_category_sub', function() {
+        return {
+            filters: {
+                'parent_item_group': ['!=', ''], // No parent
+                'is_group': 0         // Is a group
+            }
+        };
+    });
 }
 
