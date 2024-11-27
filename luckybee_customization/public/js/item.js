@@ -1,7 +1,20 @@
 
 
 frappe.ui.form.on('Item', {
+
+    item_group(frm){
+        set_filter_in_cat_basis_of_ite_grp(frm)
+    },
+   custom_category(frm){
+    set_filter_in_subcat_on_the_basis_of_cat(frm)
+    },
     refresh(frm){
+        if(frm.doc.custom_category){
+            set_filter_in_subcat_on_the_basis_of_cat(frm)
+        }
+        if(frm.doc.item_group){
+            set_filter_in_cat_basis_of_ite_grp(frm)
+        }
         // #call function to sort supplier history 
         sort_supplier_history_desc(frm) 
 
@@ -10,11 +23,17 @@ frappe.ui.form.on('Item', {
         set_parent_group(frm)
 
         // set group category
-        set_category_group(frm)
+        if (!frm.doc.item_group){
+
+            set_category_group(frm)
+        }
 
 
         // set sub category
-        set_sub_category_group(frm)
+        if(!frm.doc.custom_category){
+
+            set_sub_category_group(frm)
+        }
 
         // #hide index in supplier history because we are sorting on refresh 
         $(document).ready(function() {
@@ -197,4 +216,32 @@ function set_sub_category_group(frm) {
         };
     });
 }
+
+
+// set filter in  sub category  group in item
+function set_filter_in_cat_basis_of_ite_grp(frm) {
+    frm.set_query('custom_category', function() {
+        return {
+            filters: {
+                'parent_item_group': ['=', frm.doc.item_group], // No parent
+                'is_group': 1       // Is a group
+            }
+        };
+    });
+}
+
+// set filter in  sub category  group in item
+function set_filter_in_subcat_on_the_basis_of_cat(frm) {
+    frm.set_query('custom_category_sub', function() {
+        return {
+            filters: {
+                'parent_item_group': ['=', frm.doc.custom_category], // No parent
+                'is_group': 0     // Is a group
+            }
+        };
+    });
+}
+
+
+
 
