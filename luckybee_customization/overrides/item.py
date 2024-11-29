@@ -82,8 +82,8 @@ def sync_keepa_item(doc, event):
 						doc.custom_categories_tree = ", ".join(category_tree)
 					if category_tree_dict:
 						doc.custom_category_root = category_tree_dict.get(products[0].get('rootCategory'))
-						if not doc.custom_category:
-							doc.custom_category = category_tree_dict.get(products[0].get('rootCategory'))
+						# if not doc.custom_category:-------------------->comment on 29 nov
+						# 	doc.custom_category = category_tree_dict.get(products[0].get('rootCategory'))----------------->comment on 29 nov
 					
 					# doc.ean =  re.findall('[0-9]+', json.dumps(products[i]['eanList'][0]))[0] if products[i]['eanList'] is not None else ''
 					doc.custom_ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''
@@ -259,8 +259,8 @@ def sync_keepa_item(doc, event):
 							doc.custom_categories_tree = ", ".join(category_tree)
 						if category_tree_dict:
 							doc.custom_category_root = category_tree_dict.get(products[0].get('rootCategory'))
-							if not doc.custom_category:
-								doc.custom_category = category_tree_dict.get(products[0].get('rootCategory'))
+							# if not doc.custom_category:----------------->coment 29 nov
+							# 	doc.custom_category = category_tree_dict.get(products[0].get('rootCategory'))----------------->coment 29 nov
 						
 						# doc.ean =  re.findall('[0-9]+', json.dumps(products[i]['eanList'][0]))[0] if products[i]['eanList'] is not None else ''
 						doc.custom_ean =  products[i]['eanList'][0] if products[i]['eanList'] else ''

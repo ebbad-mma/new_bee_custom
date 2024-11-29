@@ -12,7 +12,6 @@ def safe_float_conversion(rate, default_value=0.0):
         return default_value
 @frappe.whitelist()
 def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,disc3, disc, gst, mrp, lrp, brand, group, category, sub_category,item_index):
-	frappe.log_error("Mrp",mrp)
 	frappe.log_error(f"{disc1}-{disc2}-{disc3}-{disc}")
 	doc = json.loads(doc)
 	dict_itm = {}
@@ -106,17 +105,33 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				'item_tax_template': gst
 			})
 			tax_entry.insert(ignore_permissions=True)
+			if not frappe.db.exists('Item Group', group.lower()):
+				grp = frappe.new_doc('Item Group')
+				grp.item_group_name = group.lower()
+				grp.is_group = 1
+				grp.insert()
 
+			if not frappe.db.exists('Item Group', category.lower()):
+				grp = frappe.new_doc('Item Group')
+				grp.item_group_name = category.lower()
+				grp.is_group = 1
+				grp.parent_item_group = group.lower()
+				grp.insert()
 
+			if not frappe.db.exists('Item Group', sub_category.lower()):
+				grp = frappe.new_doc('Item Group')
+				grp.item_group_name = sub_category.lower()
+				grp.parent_item_group = category.lower()
+				grp.insert()
 			# update multiple values
 			frappe.db.set_value('Item',item_code_exist, {
 				'custom_mrp':safe_float_conversion(str(mrp)),
 				'gst_hsn_code':hsn,
 				'custom_luckybee_brand':new_brand,
 				'brand':new_brand,
-				'custom_group':group,
-				'custom_category':category,
-				'custom_category_sub':sub_category,
+				'item_group':group.lower(),
+				'custom_category':category.lower(),
+				'custom_category_sub':sub_category.lower(),
 				'custom_barcode':item_code_exist,
 				'custom_last_supplier':doc['supplier'],
 				'custom_last_supplier_purchase_rate':safe_float_conversion(str(rate))
@@ -125,10 +140,26 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			
 
 		if not item_code_exist:
-			frappe.log_error("new")
+			if not frappe.db.exists('Item Group', group.lower()):
+				grp = frappe.new_doc('Item Group')
+				grp.item_group_name = group.lower()
+				grp.is_group = 1
+				grp.insert()
+
+			if not frappe.db.exists('Item Group', category.lower()):
+				grp = frappe.new_doc('Item Group')
+				grp.item_group_name = category.lower()
+				grp.is_group = 1
+				grp.parent_item_group = group.lower()
+				grp.insert()
+
+			if not frappe.db.exists('Item Group', sub_category.lower()):
+				grp = frappe.new_doc('Item Group')
+				grp.item_group_name = sub_category.lower()
+				grp.parent_item_group = category.lower()
+				grp.insert()
+
 			item = frappe.new_doc("Item")
-			# item.naming_series = 'L.#####'
-			# item.item_code=custom_purchase_item
 			item.stock_uom = per
 			item.gst_hsn_code = ''
 			if len(description)>130:
@@ -136,7 +167,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			else:
 				description=description
 			item.item_name=description
-			item.item_group = 'All Groups'
+			item.item_group = group.lower()
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_last_supplier=doc['supplier']
@@ -160,10 +191,10 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			else:
 				item.brand=brand
 			item.custom_luckybee_brand = brand
-			item.custom_group = group
+			# item.custom_group = group
 
-			item.custom_category = category
-			item.custom_category_sub = sub_category
+			item.custom_category = category.lower()
+			item.custom_category_sub = sub_category.lower()
 
 			disc=str(disc)
 			gst = ""
@@ -205,9 +236,9 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 							"disc3":disc3,
 							"gst_template":gst,
 							"item_index":int(item_index),
-							"group":group,
-							"category":category,
-							"sub_category":sub_category
+							"group":group.lower(),
+							"category":category.lower(),
+							"sub_category":sub_category.lower()
 						})
 		frappe.log_error("dict",dict_itm)
 		return dict_itm

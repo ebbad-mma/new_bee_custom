@@ -36,8 +36,9 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 		frappe.log_error("int",mrp)
 		item_code_exist = frappe.db.get_value('Item', {'item_name':description}, 'item_code')
 		if not item_code_exist:
+			# frappe.throw(f"ppppp")
 			item = frappe.new_doc("Item")
-			# item.naming_series = 'L.#####'
+			item.naming_series = 'L.#####'
 			item.item_code=item.naming_series
 			# item.item_code=custom_purchase_item
 			item.custom_last_supplier=doc['supplier']
@@ -49,14 +50,23 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			else:
 				description=description
 			item.item_name=description
-			item.item_group = 'All Groups'
+			# frappe.throw(f"{group}")
+			if group:
+				if not frappe.db.exists('Item Group', group.lower()):
+					grp = frappe.new_doc('Item Group')
+					grp.item_group_name = group.lower()
+					grp.is_group = 1
+					grp.insert()
+					item.item_group =grp.name
+			else:
+				item.item_group = 'All Groups'
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_luckybee_brand = brand
 			item.brand = brand
-			item.custom_group = group
-			item.custom_category = category
-			item.custom_sub_category = sub_category
+			# item.custom_group = group
+			# item.custom_category = category
+			# item.custom_sub_category = sub_category
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
 			item.custom_ean = custom_ean
@@ -78,7 +88,9 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			# item.opening_stock=qty
 			item.standard_rate=rate
 			# item.size=qty
-			item.insert(ignore_permissions=True)
+			frappe.log_error(frappe.as_json(item.as_dict()), "Item Data Debug")
+
+			item.insert(ignore_permissions=True,ignore_mandatory=True)
 			item.custom_barcode = item.item_code
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
@@ -144,16 +156,27 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 					'item_tax_template': gst
 				})
 				tax_entry.insert(ignore_permissions=True)
-
+				final_grp=None
+				if group:
+					if not frappe.db.exists('Item Group', group.lower()):
+						grp = frappe.new_doc('Item Group')
+						grp.item_group_name = group.lower()
+						grp.is_group = 1
+						grp.insert()
+						final_grp=grp.name
+				else:
+					final_grp='All Groups'
+				frappe.throw(f"{final_grp}")
 				# Update multiple values
 				frappe.db.set_value('Item', item_code_exist, {
 					'custom_mrp': safe_float_conversion(str(mrp)),
 					'gst_hsn_code': hsn,
 					'custom_luckybee_brand': brand,
 					'brand': brand,
-					'custom_group': group,
-					'custom_category': category,
-					'custom_category_sub': sub_category,
+					'item_group': final_grp,
+					# 'custom_group': group,
+					# 'custom_category': category,
+					# 'custom_category_sub': sub_category,
 					'custom_barcode': item_code_exist,
 					'custom_last_supplier': doc['supplier'],
 					'custom_last_supplier_purchase_rate': safe_float_conversion(str(rate))

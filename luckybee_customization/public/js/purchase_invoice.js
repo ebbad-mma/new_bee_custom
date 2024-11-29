@@ -217,7 +217,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                 item_row.idx=r.message.item_index; 
                                 item_row.custom_category=r.message.category; 
                                 item_row.custom_subcategory=r.message.sub_category; 
-                                item_row.group=r.message.group; 
+                                item_row.item_group=r.message.group; 
 
                                 cur_frm.refresh_fields("items");
                                 for (let item of frm.doc.custom_custom_purchase_item) {
@@ -823,8 +823,11 @@ frappe.ui.form.on('Purchase Invoice', {
 
 // ------------------------HELPER FUNCTION TO CRATE ITEM GROUP---------------- 
 function check_and_create_item_group(groupName) {
+    // Convert the group name to lowercase
+    const lowercaseGroupName = groupName.toLowerCase();
+
     // Check if the item group exists
-    frappe.db.get_value('Item Group', {'item_group_name': groupName}, 'name', (r) => {
+    frappe.db.get_value('Item Group', {'item_group_name': lowercaseGroupName}, 'name', (r) => {
         if (!r.name) {
             // Create the item group if it doesn't exist
             frappe.call({
@@ -832,19 +835,19 @@ function check_and_create_item_group(groupName) {
                 args: {
                     doc: {
                         doctype: "Item Group",
-                        item_group_name: groupName,
+                        item_group_name: lowercaseGroupName,
                         parent_item_group: "All Item Groups",
                         is_group: 0
                     }
                 },
                 callback: function(response) {
                     if (response.message) {
-                        console.log(`Item Group "${groupName}" created successfully!`);
+                        console.log(`Item Group "${lowercaseGroupName}" created successfully!`);
                     }
                 }
             });
         } else {
-            console.log(`Item Group "${groupName}" already exists.`);
+            console.log(`Item Group "${lowercaseGroupName}" already exists.`);
         }
     });
 }
