@@ -58,6 +58,8 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 					grp.is_group = 1
 					grp.insert()
 					item.item_group =grp.name
+				else:
+					item.item_group = group.lower()
 			else:
 				item.item_group = 'All Groups'
 			item.custom_mrp = mrp
@@ -164,9 +166,10 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 						grp.is_group = 1
 						grp.insert()
 						final_grp=grp.name
+					else:
+						final_grp=group.lower()
 				else:
 					final_grp='All Groups'
-				frappe.throw(f"{final_grp}")
 				# Update multiple values
 				frappe.db.set_value('Item', item_code_exist, {
 					'custom_mrp': safe_float_conversion(str(mrp)),
