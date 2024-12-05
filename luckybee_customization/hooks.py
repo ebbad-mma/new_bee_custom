@@ -285,6 +285,5 @@ fixtures = [
         
     }
     ]
-# website_route_rules = [{'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'},]
 
 website_route_rules = [{'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'}, {'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'}, {'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'},]
