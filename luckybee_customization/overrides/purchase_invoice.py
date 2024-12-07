@@ -109,6 +109,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				grp = frappe.new_doc('Item Group')
 				grp.item_group_name = group.lower()
 				grp.is_group = 1
+				grp.custom_type_of_group ='Item Group'
 				grp.insert()
 
 			if not frappe.db.exists('Item Group', category.lower()):
@@ -116,12 +117,14 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				grp.item_group_name = category.lower()
 				grp.is_group = 1
 				grp.parent_item_group = group.lower()
+				grp.custom_type_of_group ='Category'
 				grp.insert()
 
 			if not frappe.db.exists('Item Group', sub_category.lower()):
 				grp = frappe.new_doc('Item Group')
 				grp.item_group_name = sub_category.lower()
 				grp.parent_item_group = category.lower()
+				grp.custom_type_of_group ='Sub Category'
 				grp.insert()
 			# update multiple values
 			frappe.db.set_value('Item',item_code_exist, {
@@ -143,6 +146,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			if not frappe.db.exists('Item Group', group.lower()):
 				grp = frappe.new_doc('Item Group')
 				grp.item_group_name = group.lower()
+				grp.custom_type_of_group ='Item Group'
 				grp.is_group = 1
 				grp.insert()
 
@@ -151,11 +155,13 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				grp.item_group_name = category.lower()
 				grp.is_group = 1
 				grp.parent_item_group = group.lower()
+				grp.custom_type_of_group ='Category'
 				grp.insert()
 
 			if not frappe.db.exists('Item Group', sub_category.lower()):
 				grp = frappe.new_doc('Item Group')
 				grp.item_group_name = sub_category.lower()
+				grp.custom_type_of_group ='Sub Category'
 				grp.parent_item_group = category.lower()
 				grp.insert()
 

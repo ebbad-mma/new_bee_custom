@@ -55,6 +55,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				if not frappe.db.exists('Item Group', group.lower()):
 					grp = frappe.new_doc('Item Group')
 					grp.item_group_name = group.lower()
+					grp.custom_type_of_group ='Item Group'
 					grp.is_group = 1
 					grp.insert()
 					item.item_group =grp.name
@@ -164,6 +165,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 						grp = frappe.new_doc('Item Group')
 						grp.item_group_name = group.lower()
 						grp.is_group = 1
+						grp.custom_type_of_group ='Item Group'
 						grp.insert()
 						final_grp=grp.name
 					else:
