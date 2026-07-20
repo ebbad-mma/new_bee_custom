@@ -7,7 +7,7 @@
   "doctype_or_field": "DocField",
   "field_name": "product_category",
   "is_system_generated": 0,
-  "modified": "2024-08-26 14:09:53.311788",
+  "modified": "2026-07-20 11:40:23.571716",
   "module": "luckybee_customization",
   "name": "Item-product_category-hidden",
   "property": "hidden",

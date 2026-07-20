@@ -3,9 +3,6 @@
   "amazon_pricing": [
    {
     "lower_purchase_price_as__of_online_price": 5.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "5 to 20",
     "rating_2": 45.0,
     "rating_3": 55.0,
@@ -15,9 +12,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 20.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "20 to 30",
     "rating_2": 50.0,
     "rating_3": 55.0,
@@ -27,9 +21,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 30.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "30 to 40",
     "rating_2": 60.0,
     "rating_3": 65.0,
@@ -39,9 +30,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 40.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "40 to 50",
     "rating_2": 65.0,
     "rating_3": 70.0,
@@ -51,9 +39,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 50.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "50 to 60",
     "rating_2": 70.0,
     "rating_3": 75.0,
@@ -63,9 +48,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 60.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "60 to 70",
     "rating_2": 80.0,
     "rating_3": 80.0,
@@ -75,9 +57,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 70.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "70 to 80",
     "rating_2": 80.0,
     "rating_3": 85.0,
@@ -87,9 +66,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 80.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "80 to 90",
     "rating_2": 90.0,
     "rating_3": 90.0,
@@ -99,9 +75,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 90.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "amazon_pricing",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "90 to 100000",
     "rating_2": 100.0,
     "rating_3": 100.0,
@@ -113,9 +86,6 @@
   "default_amazon_price_rule": [
    {
     "lower_purchase_price_as__of_online_price": 5.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "5 to 20",
     "rating_2": 45.0,
     "rating_3": 55.0,
@@ -125,9 +95,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 20.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "20 to 30",
     "rating_2": 50.0,
     "rating_3": 55.0,
@@ -137,9 +104,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 30.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "30 to 40",
     "rating_2": 60.0,
     "rating_3": 65.0,
@@ -149,9 +113,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 40.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "40 to 50",
     "rating_2": 65.0,
     "rating_3": 70.0,
@@ -161,9 +122,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 50.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "50 to 60",
     "rating_2": 70.0,
     "rating_3": 75.0,
@@ -173,9 +131,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 60.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "60 to 70",
     "rating_2": 80.0,
     "rating_3": 80.0,
@@ -185,9 +140,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 70.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "70 to 80",
     "rating_2": 80.0,
     "rating_3": 85.0,
@@ -197,9 +149,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 80.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "80 to 90",
     "rating_2": 90.0,
     "rating_3": 90.0,
@@ -209,9 +158,6 @@
    },
    {
     "lower_purchase_price_as__of_online_price": 90.0,
-    "parent": "Amazon Pricing Rule",
-    "parentfield": "default_amazon_price_rule",
-    "parenttype": "Amazon Pricing Rule",
     "range_purchase_price_as__of_online_price": "90 to 100000",
     "rating_2": 100.0,
     "rating_3": 100.0,
