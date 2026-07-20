@@ -17,6 +17,7 @@
   {
    "fieldname": "item_price",
    "fieldtype": "Link",
+   "hidden": 1,
    "in_list_view": 0,
    "label": "Item Price",
    "options": "Item Price"
