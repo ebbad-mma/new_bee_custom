@@ -39,14 +39,24 @@ def sync_keepa_item(doc, event):
 						doc.brand = brand_name
 
 					images_csv = prod.get("imagesCSV")
+					images_list = []
 					if images_csv:
 						images_list = [img.strip() for img in images_csv.split(',') if img.strip()]
-						if images_list:
-							doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
-							for ind, image_name in enumerate(images_list):
-								field_name = f"custom_image{ind+1}"
-								image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
-								doc.set(field_name, image_url)
+					elif prod.get("images"):
+						for img_obj in prod["images"]:
+							if isinstance(img_obj, dict):
+								img_file = img_obj.get("l") or img_obj.get("m")
+								if img_file:
+									images_list.append(img_file)
+							elif isinstance(img_obj, str) and img_obj.strip():
+								images_list.append(img_obj.strip())
+
+					if images_list:
+						doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
+						for ind, image_name in enumerate(images_list):
+							field_name = f"custom_image{ind+1}"
+							image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
+							doc.set(field_name, image_url)
 
 					item_detail.manufacturer = prod.get("manufacturer")
 					listed_since = prod.get("listedSince")
@@ -149,12 +159,16 @@ def sync_keepa_item(doc, event):
 					item_detail.size = prod.get('size')
 					item_detail.color = prod.get('color')
 					item_detail.desc_feature = prod.get("description") or ""
+					if hasattr(doc, "desc_feature"):
+						doc.desc_feature = prod.get("description") or ""
 					item_detail.title = prod.get("title") or ""
 					doc.custom_amzon_item_name = prod.get("title") or ""
 					
 					features = prod.get('features') or []
 					for f_idx in range(min(5, len(features))):
 						setattr(item_detail, f"desc_feature{f_idx+1}", features[f_idx])
+						if hasattr(doc, f"desc_feature_{f_idx+1}"):
+							setattr(doc, f"desc_feature_{f_idx+1}", features[f_idx])
 
 					stats_parsed = prod.get("stats_parsed")
 					if stats_parsed:
