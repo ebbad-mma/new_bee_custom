@@ -11,7 +11,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/luckybee_customization/css/luckybee_customization.css"
-# app_include_js = "/assets/luckybee_customization/js/luckybee_customization.js"
+app_include_js = "/assets/luckybee_customization/js/dashboard_master_filter.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/luckybee_customization/css/luckybee_customization.css"
