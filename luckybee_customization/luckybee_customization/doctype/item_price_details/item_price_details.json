@@ -7,16 +7,17 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "item_price",
   "item_code",
   "uom",
   "price_list",
-  "rate"
+  "rate",
+  "item_price"
  ],
  "fields": [
   {
    "fieldname": "item_price",
    "fieldtype": "Link",
+   "in_list_view": 0,
    "label": "Item Price",
    "options": "Item Price"
   },
