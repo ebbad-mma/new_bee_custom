@@ -71,7 +71,9 @@
   "color",
   "latest_rating_time",
   "amazon_description__features_tab",
+  "section_break_amazon_desc",
   "desc_feature",
+  "section_break_amazon_features",
   "desc_feature1",
   "desc_feature2",
   "desc_feature3",
@@ -396,9 +398,19 @@
    "label": "Amazon Description &  Features"
   },
   {
+   "fieldname": "section_break_amazon_desc",
+   "fieldtype": "Section Break",
+   "label": "Amazon Description"
+  },
+  {
    "fieldname": "desc_feature",
    "fieldtype": "Text Editor",
-   "label": "Desc Feature"
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_break_amazon_features",
+   "fieldtype": "Section Break",
+   "label": "Amazon Key Features"
   },
   {
    "fieldname": "desc_feature1",
