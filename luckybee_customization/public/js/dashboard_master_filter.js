@@ -4,12 +4,18 @@ frappe.ready(function() {
     if (frappe.views.DashboardView) {
         let original_setup_page = frappe.views.DashboardView.prototype.setup_page;
         frappe.views.DashboardView.prototype.setup_page = function() {
+            if (this.doctype === 'Sales Analysis') {
+                this.hide_page_form = false;
+                console.log("Dashboard master filter initializing for Sales Analysis!");
+            }
+            
             original_setup_page.call(this);
             
             // In DashboardView, this.doctype holds the dashboard name (e.g. 'Sales Analysis')
             if (this.doctype === 'Sales Analysis') {
                 if (this.page && this.page.page_form) {
                     this.page.page_form.removeClass('hide');
+                    console.log("Removed hide class from page_form");
                 }
                 
                 let view = this;
