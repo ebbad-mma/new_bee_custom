@@ -4,41 +4,48 @@ frappe.ready(function() {
     if (frappe.views.DashboardView) {
         let original_setup_page = frappe.views.DashboardView.prototype.setup_page;
         frappe.views.DashboardView.prototype.setup_page = function() {
-            if (this.doctype === 'Sales Analysis') {
-                this.hide_page_form = false;
-                console.log("Dashboard master filter initializing for Sales Analysis!");
-            }
-            
             original_setup_page.call(this);
             
             // In DashboardView, this.doctype holds the dashboard name (e.g. 'Sales Analysis')
             if (this.doctype === 'Sales Analysis') {
-                if (this.page && this.page.page_form) {
-                    this.page.page_form.removeClass('hide');
-                    console.log("Removed hide class from page_form");
-                }
-                
                 let view = this;
                 
-                // Add custom fields
-                this.page.add_field({
-                    fieldname: 'master_from_date',
-                    label: __('From Date'),
-                    fieldtype: 'Date',
-                    default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
-                    change: function() {
-                        update_dashboard_charts(view);
+                // Add a "Set Filters" button to match the v14 layout
+                this.page.add_inner_button(__('Set Filters'), function() {
+                    if (!view.master_filter_dialog) {
+                        view.master_filter_dialog = new frappe.ui.Dialog({
+                            title: __('Set Default Filters'),
+                            fields: [
+                                {
+                                    label: 'From Date',
+                                    fieldname: 'master_from_date',
+                                    fieldtype: 'Date',
+                                    reqd: 1,
+                                    default: frappe.datetime.add_months(frappe.datetime.get_today(), -1)
+                                },
+                                {
+                                    label: 'To Date',
+                                    fieldname: 'master_to_date',
+                                    fieldtype: 'Date',
+                                    reqd: 1,
+                                    default: frappe.datetime.get_today()
+                                },
+                                {
+                                    label: 'Limit',
+                                    fieldname: 'master_limit',
+                                    fieldtype: 'Int',
+                                    reqd: 1,
+                                    default: 5
+                                }
+                            ],
+                            primary_action_label: __('Set'),
+                            primary_action: (values) => {
+                                update_dashboard_charts(view, values);
+                                view.master_filter_dialog.hide();
+                            }
+                        });
                     }
-                });
-                
-                this.page.add_field({
-                    fieldname: 'master_to_date',
-                    label: __('To Date'),
-                    fieldtype: 'Date',
-                    default: frappe.datetime.get_today(),
-                    change: function() {
-                        update_dashboard_charts(view);
-                    }
+                    view.master_filter_dialog.show();
                 });
             }
         };
@@ -48,31 +55,42 @@ frappe.ready(function() {
             original_render_dashboard_charts.call(this);
             
             if (this.doctype === 'Sales Analysis') {
-                // Trigger initial fetch
+                // Initialize default values on page load
                 setTimeout(() => {
-                    update_dashboard_charts(this);
-                }, 500);
+                    let default_values = {
+                        master_from_date: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+                        master_to_date: frappe.datetime.get_today(),
+                        master_limit: 5
+                    };
+                    update_dashboard_charts(this, default_values);
+                }, 1000);
             }
         };
     }
 });
 
-function update_dashboard_charts(view) {
-    if (!view.page.fields_dict.master_from_date || !view.page.fields_dict.master_to_date) return;
-    
-    let from_date = view.page.fields_dict.master_from_date.get_value();
-    let to_date = view.page.fields_dict.master_to_date.get_value();
+function update_dashboard_charts(view, values) {
+    let from_date = values.master_from_date;
+    let to_date = values.master_to_date;
+    let limit = values.master_limit;
     
     if (from_date && to_date && view.chart_group && view.chart_group.widgets) {
         view.chart_group.widgets.forEach(widget => {
             if (widget.chart_doc && widget.fetch) {
+                // If it's a Report chart, it expects filters on the widget.filters object
                 if (widget.chart_doc.chart_type === 'Report') {
                     if (!widget.filters) widget.filters = {};
                     widget.filters.from_date = from_date;
                     widget.filters.to_date = to_date;
+                    if (limit) widget.filters.limit = limit;
                     widget.fetch_and_update_chart();
                 } else {
-                    let args = { from_date: from_date, to_date: to_date };
+                    // For standard charts, we pass the custom filters in the args object
+                    let args = { 
+                        from_date: from_date, 
+                        to_date: to_date,
+                        limit: limit
+                    };
                     widget.fetch(widget.filters, true, args).then(() => {
                         widget.update_chart_object();
                     });
