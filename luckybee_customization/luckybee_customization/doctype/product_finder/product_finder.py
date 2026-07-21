@@ -41,7 +41,7 @@ class ProductFinder(Document):
 					"asc"
 				]
 			],
-			"productType": 0,
+			"productType": [0],
 			"perPage": 50,
 			"page": 0
 		}
