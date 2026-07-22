@@ -33,7 +33,7 @@ class ProductFinder(Document):
 	image_url = "https://images-na.ssl-images-amazon.com/images/I/"
 	
 	def validate(self):
-		api = keepa.Keepa(ProductFinder.accesskey)
+		api = keepa.Keepa(ProductFinder.accesskey, timeout=60)
 		product_params = {
 			"sort": [
 				[
@@ -93,24 +93,40 @@ class ProductFinder(Document):
 			
 			for item in products:
 				try:
-					brand=item['brand']
-					image_url = ProductFinder.image_url + item['imagesCSV'].split(',')[0]
-					list_price = item.get('stats_parsed', {}).get('avg90', {}).get('LISTPRICE', 0)
-					new_current = item.get('stats_parsed', {}).get('current', {}).get('NEW', 0)
+					brand = item.get('brand', '')
+					# Try new 'images' field first (list of image objects), fall back to deprecated 'imagesCSV'
+					image_url = ''
+					images = item.get('images')
+					if images and len(images) > 0 and images[0]:
+						img_filename = images[0].get('l') or images[0].get('m', '')
+						if img_filename:
+							image_url = 'https://m.media-amazon.com/images/I/' + img_filename
+					if not image_url:
+						images_csv = item.get('imagesCSV', '')
+						if images_csv:
+							image_url = 'https://m.media-amazon.com/images/I/' + images_csv.split(',')[0]
+					if not image_url:
+						# Fallback: use Amazon product image via ASIN
+						asin = item.get('asin', '')
+						if asin:
+							image_url = f'https://images-na.ssl-images-amazon.com/images/P/{asin}.01._SCLZZZZZZZ_.jpg'
+					list_price = item.get('stats_parsed', {}).get('avg90', {}).get('LISTPRICE', 0) or 0
+					new_current = item.get('stats_parsed', {}).get('current', {}).get('NEW', 0) or 0
 					if list_price > 0:
 						discount_percentage = ((list_price - new_current) / list_price) * 100
 					else:
 						discount_percentage = 0
 
+					category_tree = item.get('categoryTree', []) or []
 					responses.append({
-						"asin_no": item['asin'],
+						"asin_no": item.get('asin', ''),
 						'image': image_url,
-						'title': item['title'],
-						'categories_sub': ",".join([t['name'] for t in item['categoryTree']]),
-						'part_number': item['partNumber'],
-						'model': item['model'],
-						'color': item['color'],
-						'size': item['size'],
+						'title': item.get('title', ''),
+						'categories_sub': ",".join([t['name'] for t in category_tree if 'name' in t]),
+						'part_number': item.get('partNumber', '') or '',
+						'model': item.get('model', '') or '',
+						'color': item.get('color', '') or '',
+						'size': item.get('size', '') or '',
 						'mrp': list_price,
 						'online_price': new_current,
 						'discount': discount_percentage,
