@@ -9,6 +9,7 @@ frappe.ui.form.on('Item', {
     set_filter_in_subcat_on_the_basis_of_cat(frm)
     },
     refresh(frm){
+        render_velocity_dashboard(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -62,15 +63,15 @@ frappe.ui.form.on('Item', {
                 let part_number = null;
         
                 // Check if 'asin' is not present
-                if (!frm.doc.custom_asin_no && !frm.doc.custom_ean && !frm.doc.custom_url && !frm.doc.custom_fsn_no) {
+                if (!frm.doc.custom_asin_no && !frm.doc.ean && !frm.doc.custom_url && !frm.doc.custom_fsn_no) {
                     console.log("ppppppp")
                     // Directly create 'Product Finder' document if 'asin' is not available
                     let new_doc = frappe.model.get_new_doc("Product Finder");
                     new_doc.item = frm.doc.name;
                     new_doc.title = frm.doc.item_name;
                     new_doc.brand = frm.doc.brand;
-                    new_doc.root_category = frm.doc.custom_category_root;
-                    new_doc.sub_category = frm.doc.custom_category_sub;
+                    new_doc.root_category = frm.doc.category_root;
+                    new_doc.sub_category = frm.doc.lb_sub_category;
         
                     frappe.set_route("Form", "Product Finder", new_doc.name);
                     console.log("Created Product Finder without 'asin':", new_doc);
@@ -109,8 +110,8 @@ frappe.ui.form.on('Item', {
                 new_doc.model = model;
                 new_doc.part_number = part_number;
                 new_doc.color = color;
-                new_doc.root_category = frm.doc.custom_category_root;
-                new_doc.sub_category = frm.doc.custom_category_sub;
+                new_doc.root_category = frm.doc.category_root;
+                new_doc.sub_category = frm.doc.lb_sub_category;
         
                 frappe.set_route("Form", "Product Finder", new_doc.name);
                 console.log("Created Product Finder with fetched details:", new_doc);
@@ -207,7 +208,7 @@ function set_category_group(frm) {
 
 // set filter in  sub category  group in item
 function set_sub_category_group(frm) {
-    frm.set_query('custom_category_sub', function() {
+    frm.set_query('lb_sub_category', function() {
         return {
             filters: {
                 'parent_item_group': ['!=', ''], // No parent
@@ -232,7 +233,7 @@ function set_filter_in_cat_basis_of_ite_grp(frm) {
 
 // set filter in  sub category  group in item
 function set_filter_in_subcat_on_the_basis_of_cat(frm) {
-    frm.set_query('custom_category_sub', function() {
+    frm.set_query('lb_sub_category', function() {
         return {
             filters: {
                 'parent_item_group': ['=', frm.doc.custom_category], // No parent
@@ -240,6 +241,52 @@ function set_filter_in_subcat_on_the_basis_of_cat(frm) {
             }
         };
     });
+}
+
+function render_velocity_dashboard(frm) {
+    if (frm.is_new()) return;
+
+    if (!frm.dashboard || !frm.dashboard.wrapper) return;
+
+    frm.dashboard.wrapper.find('.lb-velocity-dashboard-strip').remove();
+
+    let band = frm.doc.lb_velocity_band || 'No Data';
+    let days_cover = (frm.doc.lb_days_cover !== null && frm.doc.lb_days_cover !== undefined) ? frm.doc.lb_days_cover + ' days' : 'N/A';
+    let u90 = (frm.doc.lb_units_90d !== null && frm.doc.lb_units_90d !== undefined) ? frm.doc.lb_units_90d : 0;
+    let days_since_sale = (frm.doc.lb_days_since_sale !== null && frm.doc.lb_days_since_sale !== undefined) ? frm.doc.lb_days_since_sale + ' days ago' : 'Never';
+    let stock_val = (frm.doc.lb_stock_value !== null && frm.doc.lb_stock_value !== undefined) ? '₹' + Number(frm.doc.lb_stock_value).toLocaleString('en-IN') : '₹0';
+
+    let bg_style = 'background-color: #f8fafc; border-color: #cbd5e1; color: #334155;';
+    let badge_style = 'background-color: #64748b; color: #ffffff;';
+
+    if (band === 'Fast' || band === 'Healthy') {
+        bg_style = 'background-color: #f0fdf4; border-color: #bbf7d0; color: #166534;';
+        badge_style = 'background-color: #16a34a; color: #ffffff;';
+    } else if (band === 'Slow') {
+        bg_style = 'background-color: #fffbeb; border-color: #fef3c7; color: #92400e;';
+        badge_style = 'background-color: #d97706; color: #ffffff;';
+    } else if (band === 'Dead' || band === 'Never Sold') {
+        bg_style = 'background-color: #fef2f2; border-color: #fecaca; color: #991b1b;';
+        badge_style = 'background-color: #dc2626; color: #ffffff;';
+    }
+
+    let strip_html = `
+        <div class="lb-velocity-dashboard-strip" style="margin-bottom: 15px; padding: 12px 16px; border-radius: 8px; border: 1px solid; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 500; ${bg_style}">
+            <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+                <div><span style="opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Stock Value</span> <strong>${stock_val}</strong></div>
+                <div><span style="opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block;">90d Units Sold</span> <strong>${u90}</strong></div>
+                <div><span style="opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Days Cover</span> <strong>${days_cover}</strong></div>
+                <div><span style="opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Last Sold</span> <strong>${days_since_sale}</strong></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <span style="opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Velocity Band:</span>
+                <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; ${badge_style}">${band}</span>
+            </div>
+        </div>
+    `;
+
+    frm.dashboard.wrapper.prepend(strip_html);
+    frm.dashboard.show();
 }
 
 

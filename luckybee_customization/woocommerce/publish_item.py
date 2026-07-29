@@ -77,7 +77,7 @@ def publish_item(doc):
 
     # Prepare categories
     data['categories'] = []
-    for category_key in ['custom_category_root', 'custom_category_sub']:
+    for category_key in ['category_root', 'lb_sub_category']:
         if doc.get(category_key):
             category_id = get_or_create_category(wcapi, doc[category_key])
             if category_id:
@@ -88,8 +88,8 @@ def publish_item(doc):
     # Prepare SKU, title, and images
     data.update({
         "sku": doc.get('custom_asin_no', ''),
-        "name": doc.get('custom_amzon_item_name', doc['item_name']),
-        "images": [{"src": doc[img]} for img in ['image', 'custom_image1', 'custom_image2', 'custom_image3', 'custom_image4', 'custom_image5'] if doc.get(img)],
+        "name": doc.get('title', doc['item_name']),
+        "images": [{"src": doc[img]} for img in ['image', 'lb_primary_image'] if doc.get(img)],
         "type": "simple",
         "regular_price": str(doc['custom_mrp']),
         "description": doc.get('description', ''),

@@ -18,8 +18,8 @@ def check_image(doc,method=None):
 		item_details.amazon_item_url=f"https://www.amazon.in/dp/{doc.custom_asin_no}"
 		item_details.item=doc.name
 		item_details.save()
-	elif doc.custom_ean:
-		item_details=frappe.get_doc('Item Details',{'ean':doc.custom_ean})
+	elif doc.ean:
+		item_details=frappe.get_doc('Item Details',{'ean':doc.ean})
 		item_details.item=doc.name
 		item_details.save()
 	elif doc.custom_fsn_no:
@@ -76,28 +76,28 @@ def update_item_in_woocom():
 		#fetch categories
 		if 'categories' not in data:
 			data['categories'] = []
-		if doc.custom_category_root:
-			category_id = get_or_create_category(wcapi,doc.custom_category_root)
+		if doc.category_root:
+			category_id = get_or_create_category(wcapi,doc.category_root)
 			# frappe.throw(f"{category_id}")
 			if category_id:
 				data['categories'].append({'id': category_id})
 			else:
-				frappe.log_error(f"Failed to add root category '{doc['custom_category_root']}' to WooCommerce.")
-		if doc.custom_category_sub:
-			category_id = get_or_create_category(wcapi,doc.custom_category_sub)
+				frappe.log_error(f"Failed to add root category '{doc['category_root']}' to WooCommerce.")
+		if doc.lb_sub_category:
+			category_id = get_or_create_category(wcapi,doc.lb_sub_category)
 			# frappe.throw(f"{category_id}")
 			if category_id:
 				data['categories'].append({'id': category_id})
 			else:
-				frappe.log_error(f"Failed to add root category '{doc['custom_category_root']}' to WooCommerce.")
-		# if doc.get('custom_categories_tree'):
-		#     data['categories'].append({'name':doc['custom_categories_tree'],'slug': doc['custom_categories_tree']})
+				frappe.log_error(f"Failed to add sub category '{doc['lb_sub_category']}' to WooCommerce.")
+		# if doc.get('categories_tree'):
+		#     data['categories'].append({'name':doc['categories_tree'],'slug': doc['categories_tree']})
 		#     frappe.log_error('tree',data)
 
 		#fetch asin
 		if doc.custom_asin_no:
 			data.update({"sku":doc.custom_asin_no})
-			title=doc.custom_amzon_item_name
+			title=doc.title
 		else:
 			title=doc.item_name
 
@@ -107,16 +107,8 @@ def update_item_in_woocom():
 			data['images'] = []
 		if doc.image:
 			data['images'].append({"src": doc.image})
-		if doc.custom_image1:
-			data['images'].append({'src':doc.custom_image1})
-		if doc.custom_image2:
-			data['images'].append({'src':doc.custom_image2})
-		if doc.custom_image3:
-			data['images'].append({'src':doc.custom_image3})
-		if doc.custom_image4:
-			data['images'].append({'src':doc.custom_image4})
-		if doc.custom_image5:
-			data['images'].append({'src':doc.custom_image5})
+		if doc.lb_primary_image:
+			data['images'].append({'src':doc.lb_primary_image})
 		
 		#fetch description from item details
 		# Ensure 'short_description' is initialized
@@ -170,7 +162,5 @@ def update_item_in_woocom():
 
 # -----------------------HELPER FUNCTION  TO UPDATE STOCK IN HAND FIELD IN ITEM MASTER---------------
 def update_stock_in_hand_in_item_master(doc):
-	if frappe.db.exists('Bin',{'item_code':doc.name}):
-		actual_qty=frappe.db.get_value('Bin',{'item_code':doc.name},'actual_qty')
-		doc.db_set('custom_stock_in_hand',actual_qty)
+	pass
 

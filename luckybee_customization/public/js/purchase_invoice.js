@@ -8,7 +8,7 @@ frappe.ui.form.on('Purchase Invoice', {
 
     custom_search_and_insert_item(frm,cdt,cdn) {
         let purchase =frm.doc.custom_custom_purchase_item;
-            if (purchase[0].custom_asin || purchase[0].custom_ean){frm.set_value('custom_is_asin',1)}
+            if (purchase[0].custom_asin || purchase[0].custom_ean || purchase[0].ean){frm.set_value('custom_is_asin',1)}
             else if (purchase[0].custom_fsn){frm.set_value('custom_is_fsn',1)}
             else { 
                 {frm.set_value('custom_non_asin',1)}
@@ -43,7 +43,7 @@ frappe.ui.form.on('Purchase Invoice', {
                                 'sub_category': obj.sub_category != null ? obj.sub_category : "",
                                 'custom_asin': obj.custom_asin != null ? obj.custom_asin : "",
                                 'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
-                                "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
+                                "custom_ean": obj.custom_ean != null ? obj.custom_ean : (obj.ean != null ? obj.ean : ""),
                                 "disc": obj.disc != null ? flt(obj.disc) : 0,
                                 'disc1': obj.disc_ != null ? flt(obj.disc_) : 0,
                                 'disc2': obj.disc2 != null ? flt(obj.disc2) : 0,
@@ -102,7 +102,7 @@ frappe.ui.form.on('Purchase Invoice', {
                         });
                     }
                     let fi = frm.doc.custom_custom_purchase_item[0];
-                    if (fi.custom_asin == null && fi.custom_ean == null) {
+                    if (fi.custom_asin == null && fi.custom_ean == null && fi.ean == null) {
                         let fields = [];
                     }
                 

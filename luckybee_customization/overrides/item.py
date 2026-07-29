@@ -84,9 +84,9 @@ def sync_keepa_item(doc, event):
 					csv_data = prod.get('csv') or []
 					if len(csv_data) > 0:
 						if len(csv_data) >= 18 and csv_data[17]:
-							doc.custom_reviews_count = csv_data[17][-1]
+							doc.reviews_count = csv_data[17][-1]
 						if len(csv_data) >= 17 and csv_data[16]:
-							doc.custom_reviews_rating = str(csv_data[16][-1]/10)
+							doc.reviews_rating = str(csv_data[16][-1]/10)
 					
 					item_detail.parent_asin = prod.get("parentAsin")
 					category_tree = []
@@ -97,12 +97,13 @@ def sync_keepa_item(doc, event):
 
 					if category_tree:
 						doc.category_sub = category_tree[-1]
-						doc.custom_categories_tree = ", ".join(category_tree)
+						doc.categories_tree = ", ".join(category_tree)
 					if category_tree_dict and prod.get('rootCategory'):
-						doc.custom_category_root = category_tree_dict.get(prod.get('rootCategory'))
+						doc.category_root = category_tree_dict.get(prod.get('rootCategory'))
 
 					ean_list = prod.get('eanList')
-					doc.custom_ean = ean_list[0] if ean_list else ''
+					if ean_list:
+						doc.ean = ean_list[0]
 
 					if prod.get('upcList') is not None:
 						item_detail.product_codes_upc = json.dumps(prod.get('upcList'))
@@ -162,7 +163,7 @@ def sync_keepa_item(doc, event):
 					if hasattr(doc, "desc_feature"):
 						doc.desc_feature = prod.get("description") or ""
 					item_detail.title = prod.get("title") or ""
-					doc.custom_amzon_item_name = prod.get("title") or ""
+					doc.title = prod.get("title") or ""
 					
 					features = prod.get('features') or []
 					for f_idx in range(min(5, len(features))):
@@ -180,7 +181,7 @@ def sync_keepa_item(doc, event):
 						highest = stats_parsed.get("max")
 						if current:
 							item_detail.sales_rank_current_price = current.get("SALES")
-							doc.custom_last_price = current.get("LISTPRICE")
+							doc.last_price = current.get("LISTPRICE")
 							doc.custom_new_current = current.get("NEW")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
@@ -207,30 +208,30 @@ def sync_keepa_item(doc, event):
 								item_detail.new_highest = new_highest[1]
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
-								doc.custom_list_price_highest = highest_listprice[1]
-				if doc.custom_ean:
-					item_detail.ean = doc.custom_ean
+								doc.list_price_highest = highest_listprice[1]
+				if doc.ean:
+					item_detail.ean = doc.ean
 				item_detail.save()
 				doc.custom_item_detail = item_detail.name
 
-	elif doc.custom_ean:
-		EAN = [doc.custom_ean]
+	elif doc.ean:
+		EAN = [doc.ean]
 		if EAN:
 			if not doc.custom_asin_no:
-				if not frappe.db.exists('Item Details', {'ean': doc.custom_ean}):
+				if not frappe.db.exists('Item Details', {'ean': doc.ean}):
 					item_det = frappe.new_doc('Item Details')
-					item_det.ean = doc.custom_ean
+					item_det.ean = doc.ean
 					item_det.save()
-			if frappe.db.exists('Item Details', {'ean': doc.custom_ean}):
-				item_detail = frappe.get_doc('Item Details', {'ean': doc.custom_ean})
+			if frappe.db.exists('Item Details', {'ean': doc.ean}):
+				item_detail = frappe.get_doc('Item Details', {'ean': doc.ean})
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False)
 			except Exception as e:
-				frappe.log_error(f"Invalid EAN: {doc.custom_ean}")
+				frappe.log_error(f"Invalid EAN: {doc.ean}")
 				return
 			
 			if not products or not isinstance(products, list):
-				frappe.log_error(f"No products found for {doc.custom_ean}")
+				frappe.log_error(f"No products found for {doc.ean}")
 				return
 			else:
 				for i in range(len(EAN)):
@@ -284,9 +285,9 @@ def sync_keepa_item(doc, event):
 					csv_data = prod.get('csv') or []
 					if len(csv_data) > 0:
 						if len(csv_data) >= 18 and csv_data[17]:
-							doc.custom_reviews_count = csv_data[17][-1]
+							doc.reviews_count = csv_data[17][-1]
 						if len(csv_data) >= 17 and csv_data[16]:
-							doc.custom_reviews_rating = str(csv_data[16][-1]/10)
+							doc.reviews_rating = str(csv_data[16][-1]/10)
 					
 					item_detail.parent_asin = prod.get("parentAsin")
 					category_tree = []
@@ -297,12 +298,13 @@ def sync_keepa_item(doc, event):
 
 					if category_tree:
 						doc.category_sub = category_tree[-1]
-						doc.custom_categories_tree = ", ".join(category_tree)
+						doc.categories_tree = ", ".join(category_tree)
 					if category_tree_dict and prod.get('rootCategory'):
-						doc.custom_category_root = category_tree_dict.get(prod.get('rootCategory'))
+						doc.category_root = category_tree_dict.get(prod.get('rootCategory'))
 					
 					ean_list = prod.get('eanList')
-					doc.custom_ean = ean_list[0] if ean_list else ''
+					if ean_list:
+						doc.ean = ean_list[0]
 
 					if prod.get('upcList') is not None:
 						item_detail.product_codes_upc = json.dumps(prod.get('upcList'))
@@ -356,7 +358,7 @@ def sync_keepa_item(doc, event):
 					item_detail.color = prod.get('color')
 					item_detail.desc_feature = prod.get("description") or ""
 					item_detail.title = prod.get("title") or ""
-					doc.custom_amzon_item_name = prod.get("title") or ""
+					doc.title = prod.get("title") or ""
 
 					features = prod.get('features') or []
 					for f_idx in range(min(5, len(features))):
@@ -372,7 +374,7 @@ def sync_keepa_item(doc, event):
 						highest = stats_parsed.get("max")
 						if current:
 							item_detail.sales_rank_current_price = current.get("SALES")
-							doc.custom_last_price = current.get("LISTPRICE")
+							doc.last_price = current.get("LISTPRICE")
 							doc.custom_new_current = current.get("NEW")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
@@ -399,7 +401,7 @@ def sync_keepa_item(doc, event):
 								item_detail.new_highest = new_highest[1]
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
-								doc.custom_list_price_highest = highest_listprice[1]
+								doc.list_price_highest = highest_listprice[1]
 
 					if doc.custom_asin_no:
 						item_detail.asin_no = doc.custom_asin_no

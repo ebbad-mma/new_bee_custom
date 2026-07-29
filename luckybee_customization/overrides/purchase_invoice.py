@@ -127,19 +127,22 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				grp.custom_type_of_group ='Sub Category'
 				grp.insert()
 			# update multiple values
-			frappe.db.set_value('Item',item_code_exist, {
+			update_vals = {
 				'custom_mrp':safe_float_conversion(str(mrp)),
 				'gst_hsn_code':hsn,
 				'custom_luckybee_brand':new_brand,
 				'brand':new_brand,
 				'item_group':group.lower(),
 				'custom_category':category.lower(),
-				'custom_category_sub':sub_category.lower(),
-				'custom_barcode':item_code_exist,
+				'lb_sub_category':sub_category.lower(),
 				'custom_last_supplier':doc['supplier'],
 				'custom_last_supplier_purchase_rate':safe_float_conversion(str(rate))
-
-			})
+			}
+			# Only set custom_barcode if not already set (protect LX codes)
+			existing_barcode = frappe.db.get_value('Item', item_code_exist, 'custom_barcode')
+			if not existing_barcode:
+				update_vals['custom_barcode'] = item_code_exist
+			frappe.db.set_value('Item',item_code_exist, update_vals)
 			
 
 		if not item_code_exist:
@@ -200,7 +203,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			# item.custom_group = group
 
 			item.custom_category = category.lower()
-			item.custom_category_sub = sub_category.lower()
+			item.lb_sub_category = sub_category.lower()
 
 			disc=str(disc)
 			gst = ""
@@ -224,7 +227,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			barcode_row = item.append("barcodes", {})
 			barcode_row.barcode = item.item_code
 			item.save()
-		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','last_purchase_rate'])
+		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating','last_purchase_rate'])
 		dict_itm.update({
 							"item_code": item_code,
 							"reviews_rating": reviews_rating,

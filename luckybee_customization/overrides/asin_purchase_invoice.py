@@ -50,6 +50,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			else:
 				description=description
 			item.item_name=description
+			item.title=description
 			# frappe.throw(f"{group}")
 			if group:
 				if not frappe.db.exists('Item Group', group.lower()):
@@ -72,7 +73,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 			# item.custom_sub_category = sub_category
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
-			item.custom_ean = custom_ean
+			item.ean = custom_ean
 			item.append('item_defaults',{'company':'Samyak Resources','default_warehouse':'Stores - SR'})
 			# item.custon_fsn_no = custom_fsn
 
@@ -173,7 +174,7 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 				else:
 					final_grp='All Groups'
 				# Update multiple values
-				frappe.db.set_value('Item', item_code_exist, {
+				update_vals = {
 					'custom_mrp': safe_float_conversion(str(mrp)),
 					'gst_hsn_code': hsn,
 					'custom_luckybee_brand': brand,
@@ -182,15 +183,19 @@ def search_and_insert_item(doc,description, hsn, qty, rate, per, mrp, lrp, brand
 					# 'custom_group': group,
 					# 'custom_category': category,
 					# 'custom_category_sub': sub_category,
-					'custom_barcode': item_code_exist,
 					'custom_last_supplier': doc['supplier'],
 					'custom_last_supplier_purchase_rate': safe_float_conversion(str(rate))
-				})
+				}
+				# Only set custom_barcode if not already set (protect LX codes)
+				existing_barcode = frappe.db.get_value('Item', item_code_exist, 'custom_barcode')
+				if not existing_barcode:
+					update_vals['custom_barcode'] = item_code_exist
+				frappe.db.set_value('Item', item_code_exist, update_vals)
 
 
-		result = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating', 'custom_new_current', 'custom_reviews_count', 'custom_last_supplier_purchase_rate', 'custom_last_price', 'custom_list_price_highest'])
+		result = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating', 'new_current', 'reviews_count', 'last_purchase_rate', 'last_price', 'list_price_highest'])
 		frappe.log_error('RESULT',f"{result}///{description}")			
-		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','custom_last_supplier_purchase_rate','custom_last_price','custom_list_price_highest'])
+		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest= frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating','new_current','reviews_count','last_purchase_rate','last_price','list_price_highest'])
 		# mrp=int(last_price) if int(last_price) > 0 else int(list_price_highest)
 		last_price_safe = safe_int(last_price)
 		list_price_highest_safe = safe_int(list_price_highest)

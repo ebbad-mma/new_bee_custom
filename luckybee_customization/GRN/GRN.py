@@ -18,12 +18,12 @@ def get_fields(purchase_invoice):
         # if brand:
         #     res["brand"] = brand[0]                
         res["brand"] = item_doc.brand
-        if item_doc.custom_last_price:
-            res['mrp'] = item_doc.custom_last_price
-        elif item_doc.custom_list_price_highest:
-            res['mrp'] = item_doc.custom_list_price_highest
-        res["ean"] = item_doc.custom_ean
-        res["subcategory"] = item_doc.custom_category_sub
+        if item_doc.last_price:
+            res['mrp'] = item_doc.last_price
+        elif item_doc.list_price_highest:
+            res['mrp'] = item_doc.list_price_highest
+        res["ean"] = item_doc.ean
+        res["subcategory"] = item_doc.lb_sub_category
         image_list = []
         for i in range(1,6+1):
             f = f"custom_image{i}"
@@ -49,7 +49,7 @@ def update_data(doc, item_name):
     item_doc.save()
 
     item_main = frappe.get_doc("Item", doc['product'])
-    item_main.custom_sub_category = doc['subcategory']
+    item_main.lb_sub_category = doc['subcategory']
     item_main.save()
     # frappe.log_error("Incoming data", f"{item_data['received_qty']}, {item_doc.received_qty}")
     # frappe.log_error("Incoming data", f"{item_doc.as_dict()}, \nIncoming: {doc['received_quantity']}")

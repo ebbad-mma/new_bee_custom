@@ -163,7 +163,7 @@ const PWA = () => {
             db.updateDoc('Item', currentItemCode, {
                 brand: currItem.brand,
                 custom_mrp: currItem.custom_mrp,
-                ean: currItem.custom_ean,
+                ean: currItem.custom_ean || currItem.ean,
                 custom_sub_category: currItem.custom_subcategory,
                 description: currItem.description,
 
@@ -648,7 +648,7 @@ const PWA = () => {
                     <div className="container">
                         <div className="field">
                             <label>EAN</label>
-                            <input type="number" id="ean" name="custom_ean" value={currItem?.custom_ean} onChange={handleInputChange} />
+                            <input type="number" id="ean" name="ean" value={currItem?.custom_ean || currItem?.ean || ''} onChange={handleInputChange} />
                         </div>
                         <div className="field">
                             <label>MRP:</label>

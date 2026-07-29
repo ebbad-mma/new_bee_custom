@@ -49,7 +49,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 			item.custom_luckybee_brand = brand
 			item.custom_group = group
 			item.custom_category = category
-			item.custom_category_sub = sub_category
+			item.lb_sub_category = sub_category
 			item.custom_asin_no = custom_asin
 			item.custom_box_number=custom_box_number
 			# item.custom_last_supplier=doc['supplier']
@@ -98,20 +98,24 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 				# 			'rate': last_rate
 				# 		})
 				# 		child.insert(ignore_permissions=True)
-				frappe.db.set_value('Item', item_code_exist, {
+				update_vals = {
 					'custom_mrp': mrp,
 					'gst_hsn_code': hsn,
 					'custom_luckybee_brand': brand,
 					'brand': brand,
 					'custom_group': group,
 					'custom_category': category,
-					'custom_category_sub': sub_category,
-					'custom_barcode': item_code_exist,
+					'lb_sub_category': sub_category,
 					'custom_sq_item': 1
 					# 'custom_last_supplier': doc['supplier'],
 					# 'custom_last_supplier_purchase_rate': safe_float_conversion(rate)
-				})				
-		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest,brand,custom_image1,custom_amzon_item_name=frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','custom_new_current','custom_reviews_count','last_purchase_rate','custom_last_price','custom_list_price_highest','brand','custom_image1','custom_amzon_item_name'])
+				}
+				# Only set custom_barcode if not already set (protect LX codes)
+				existing_barcode = frappe.db.get_value('Item', item_code_exist, 'custom_barcode')
+				if not existing_barcode:
+					update_vals['custom_barcode'] = item_code_exist
+				frappe.db.set_value('Item', item_code_exist, update_vals)				
+		item_code, reviews_rating,new_current,reviews_count,last_purchase_rate,last_price,list_price_highest,brand,lb_primary_image,title=frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating','new_current','reviews_count','last_purchase_rate','last_price','list_price_highest','brand','lb_primary_image','title'])
 		# get item details to calculatelrp 
 		if frappe.db.exists('Item Details',{'item':item_name}):
 			avg_30, avg_90 = frappe.db.get_value(
@@ -138,8 +142,9 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per,disc1,disc2,dis
 							"last_purchase_rate":last_purchase_rate,
 							"mrp":safe_float_conversion(mrp),
 							"brand":brand,
-							"custom_image1":custom_image1,
-							"custom_amzon_item_name":custom_amzon_item_name[1:139],
+							"lb_primary_image":lb_primary_image,
+							"title": (title or "")[1:139],
+							"custom_amzon_item_name": (title or "")[1:139],
 							"amount":safe_float_conversion(amount),
 							"uom":per,
 							"gst_disc":disc,

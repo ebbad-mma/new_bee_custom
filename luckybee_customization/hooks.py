@@ -36,7 +36,9 @@ doctype_js = {
     'Supplier Quotation' : "public/js/supplier_quotation.js",
     'Sales Invoice' : "public/js/sales_invoice.js"
 }
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {
+    "Item": "public/js/item_list.js"
+}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -141,23 +143,17 @@ doctype_js = {
 # ---------------
 
 scheduler_events = {
-  "cron": {
-    "0 */2 * * *": [
-        "luckybee_customization.woocommerce.update_webhook_status.update_webhook_status_by_scheduler"
+    "cron": {
+        "0 */2 * * *": [
+            "luckybee_customization.woocommerce.update_webhook_status.update_webhook_status_by_scheduler"
+        ]
+    },
+    "daily": [
+        "luckybee_customization.jobs.refresh_velocity"
+    ],
+    "hourly": [
+        "luckybee_customization.overrides.item_utils.update_item_in_woocom"
     ]
-},
-# 	"daily": [
-# 		"luckybee_customization.tasks.daily"
-# 	],
-	"hourly": [
-		"luckybee_customization.overrides.item_utils.update_item_in_woocom"
-	]
-# 	"weekly": [
-# 		"luckybee_customization.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"luckybee_customization.tasks.monthly"
-# 	],
 }
 
 # Testing
@@ -238,10 +234,16 @@ scheduler_events = {
 
 doc_events = {
     "Item": {
-		"before_save": "luckybee_customization.overrides.item.sync_keepa_item",
+		"before_save": [
+			"luckybee_customization.overrides.item.sync_keepa_item",
+			"luckybee_customization.item_hooks.calculate_margins",
+			"luckybee_customization.receiving.recompute_status"
+		],
 		"on_update": "luckybee_customization.overrides.item_utils.check_image"
-        }
-        ,
+        },
+        "Purchase Receipt": {
+		"on_submit": "luckybee_customization.receiving.flag_items"
+        },
         "Purchase Invoice": {
 		"on_submit": "luckybee_customization.overrides.bin.update_stock_in_hand",
 		"before_submit": "luckybee_customization.overrides.bin.set_warehouse_and_update_stock",

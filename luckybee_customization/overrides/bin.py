@@ -42,9 +42,10 @@ def create_item_price(doc):
             # -----------------comment for now---------------------
             saved_item=frappe.get_doc('Item',item.item_code)
             ip = frappe.get_doc("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"})
-            if str(ip.price_list_rate) != str(item.custom_lrp):
-                ip.price_list_rate = item.custom_lrp
-                ip.save()
+            if item.get('custom_lrp') and float(item.custom_lrp) > 0:
+                if str(ip.price_list_rate) != str(item.custom_lrp):
+                    ip.price_list_rate = item.custom_lrp
+                    ip.save()
             exists = any(d.price_list == 'Standard Selling' for d in saved_item.custom_item_price_details)
             if not exists:
                 saved_item.append('custom_item_price_details',{'item_code': item.item_code,'uom':ip.uom,'item_price':ip.name,'rate':item.custom_lrp,'price_list':'Standard Selling'})

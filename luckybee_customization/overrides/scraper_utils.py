@@ -182,35 +182,9 @@ def scrape(fsn):
 
 
 
-def set_images(doc,image_list):    
-	n_images = min(len(image_list), 6)    
-	if n_images == 1:
-		doc.custom_image1 = image_list[0]
-	if n_images == 2:
-		doc.custom_image1 = image_list[0]
-		doc.custom_image2 = image_list[1]
-	if n_images == 3:
-		doc.custom_image1 = image_list[0]
-		doc.custom_image2 = image_list[1]
-		doc.custom_image3 = image_list[2]
-	if n_images == 4:
-		doc.custom_image1 = image_list[0]
-		doc.custom_image2 = image_list[1]
-		doc.custom_image3 = image_list[2]
-		doc.custom_image4 = image_list[3]
-	if n_images == 5:
-		doc.custom_image1 = image_list[0]
-		doc.custom_image2 = image_list[1]
-		doc.custom_image3 = image_list[2]
-		doc.custom_image4 = image_list[3]
-		doc.custom_image5 = image_list[4]
-	if n_images == 6:
-		doc.custom_image1 = image_list[0]
-		doc.custom_image2 = image_list[1]
-		doc.custom_image3 = image_list[2]
-		doc.custom_image4 = image_list[3]
-		doc.custom_image5 = image_list[4]
-		doc.custom_image6 = image_list[5]
+def set_images(doc, image_list):
+	if image_list:
+		doc.lb_primary_image = image_list[0]
 
 def extract_pid_with_regex(url):
 	pattern = r'pid=([^&]+)'

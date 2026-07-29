@@ -2,7 +2,7 @@ frappe.ui.form.on('Supplier Quotation', {
     custom_search_and_insert_item(frm,cdt,cdn) {
         let purchase =frm.doc.custom_supplier_quotation_item;
             // console.log(purchase[0].custom_box_number)
-            if (purchase[0].custom_asin || purchase[0].custom_ean){frm.doc.custom_is_asin =1
+            if (purchase[0].custom_asin || purchase[0].custom_ean || purchase[0].ean){frm.doc.custom_is_asin =1
             }
 
        if(!frm.doc.supplier){frappe.msgprint('Please select supplier')}
@@ -32,7 +32,7 @@ frappe.ui.form.on('Supplier Quotation', {
                             'sub_category': obj.sub_category != null ? obj.sub_category : "",
                             'custom_asin': obj.custom_asin != null ? obj.custom_asin : "",
                             'custom_box_number': obj.custom_box_number != null ? obj.custom_box_number : "",
-                            "custom_ean": obj.custom_ean != null ? obj.custom_ean : "",
+                            "custom_ean": obj.custom_ean != null ? obj.custom_ean : (obj.ean != null ? obj.ean : ""),
                             "custom_synced": obj.custom_synced != null ? obj.custom_synced :"0",
                             "amount": obj.amount != null ? obj.amount :"0",
                             "item_index": obj.idx
@@ -55,7 +55,7 @@ frappe.ui.form.on('Supplier Quotation', {
                                 item_row.item_code = r.message.item_code;
                                 item_row.custom_item_index = r.message.item_index;
                                 item_row.idx = r.message.item_index;
-                                item_row.item_name = r.message.custom_amzon_item_name;
+                                item_row.item_name = r.message.title || r.message.custom_amzon_item_name;
                                 item_row.qty = r.message.qty;
                                 item_row.uom = r.message.uom;
                                 item_row.rate = pp_after_disc_cal;
@@ -77,7 +77,7 @@ frappe.ui.form.on('Supplier Quotation', {
                                 item_row.custom_ppmumrpdap='PASP';
                                 item_row.brand=r.message.brand;
                                 item_row.description=r.message.item_name;
-                                item_row.image_view=r.message.custom_image1
+                                item_row.image_view=r.message.lb_primary_image
                                 // item_row.conversion_factor=1
                                 calculate_lrp_and_apply_discount(frm,cdt,cdn,item_row)
                                 // console.log("checkkkkk",item_row.item_name)
@@ -105,7 +105,7 @@ frappe.ui.form.on('Supplier Quotation', {
                     });
                 }
                 let fi = frm.doc.custom_custom_purchase_item[0];
-                if (fi.custom_asin == null && fi.custom_ean == null) {
+                if (fi.custom_asin == null && fi.custom_ean == null && fi.ean == null) {
                     let fields = [];
                 }
             } 
