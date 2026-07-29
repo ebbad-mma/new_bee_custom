@@ -14,7 +14,49 @@ def execute():
     """
     print("Executing Patch: bulk_margin_and_velocity_backfill...")
 
-    # Ensure custom fields exist in tabItem DB table schema before writing values
+    # 0. Ensure ROW_FORMAT=DYNAMIC on tabItem to prevent MariaDB row size too large error (1118)
+    try:
+        frappe.db.sql("ALTER TABLE `tabItem` ROW_FORMAT=DYNAMIC;")
+    except Exception as e:
+        print(f"Notice: ALTER TABLE ROW_FORMAT=DYNAMIC: {e}")
+
+    # 1. Add missing columns directly to DB table tabItem individually
+    fields_to_add = [
+        ("lb_units_30d", "Int"),
+        ("lb_units_90d", "Int"),
+        ("lb_units_180d", "Int"),
+        ("lb_units_365d", "Int"),
+        ("lb_days_cover", "Int"),
+        ("lb_days_since_sale", "Int"),
+        ("lb_days_since_receipt", "Int"),
+        ("lb_stock_value", "Currency"),
+        ("lb_sell_through", "Float"),
+        ("lb_margin_pct", "Float"),
+        ("amz_delta_pct", "Float"),
+        ("mrp_discount_pct", "Float"),
+        ("lb_velocity_band", "Data"),
+        ("lb_data_status", "Data"),
+        ("amz_data_status", "Data"),
+        ("lb_sub_category", "Link"),
+        ("lb_category_type", "Data"),
+        ("lb_lot_ref", "Data"),
+        ("custom_legacy_barcode", "Data"),
+        ("lb_primary_image", "Text"),
+        ("lb_mrp_confirmed", "Check"),
+        ("amz_last_synced", "Date"),
+        ("lb_received_captured_on", "Date")
+    ]
+
+    for fname, ftype in fields_to_add:
+        if not frappe.db.has_column("Item", fname):
+            try:
+                frappe.db.add_column("Item", fname, ftype)
+            except Exception as ex:
+                print(f"Warning adding column {fname}: {ex}")
+
+    frappe.db.commit()
+
+    # 2. Ensure Custom Field DocType records exist for Desk forms UI
     try:
         fixture_path = frappe.get_app_path("luckybee_customization", "fixtures", "custom_field.json")
         if os.path.exists(fixture_path):
@@ -27,10 +69,10 @@ def execute():
     except Exception as e:
         print(f"Warning in patch syncing custom fields: {e}")
 
-    # 1. Run Nightly Product Velocity Scoring Job
+    # 3. Run Nightly Product Velocity Scoring Job
     refresh_velocity()
 
-    # 2. Bulk Recalculate Margins across all Stock Items
+    # 4. Bulk Recalculate Margins across all Stock Items
     items = frappe.get_all("Item", filters={"is_stock_item": 1}, fields=["name", "last_purchase_rate", "custom_mrp", "valuation_rate", "last_price"])
     print(f"Recalculating margin fields for {len(items)} stock items...")
 
