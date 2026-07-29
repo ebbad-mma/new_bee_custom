@@ -291,21 +291,44 @@ function render_velocity_dashboard(frm) {
 }
 
 function setup_4_tab_structure(frm) {
-    // 1. Rename / format Tab Breaks
-    const tabs = {
+    // 1. Rename the 4 primary tabs
+    const primary_tabs = {
         'details': '1. Details',
-        'custom_pricing_margin_tab': '2. Pricing & Margin',
-        'custom_market_intelligence_tab': '3. Market Intelligence',
-        'custom_inventory_operations_tab': '4. Inventory & Operations'
+        'pricing_tab': '2. Pricing & Margin',
+        'keepa_description_feature': '3. Market Intelligence',
+        'inventory_section': '4. Inventory & Operations'
     };
 
-    Object.keys(tabs).forEach(fieldname => {
+    Object.keys(primary_tabs).forEach(fieldname => {
         if (frm.fields_dict[fieldname]) {
-            frm.set_df_property(fieldname, 'label', tabs[fieldname]);
+            frm.set_df_property(fieldname, 'label', primary_tabs[fieldname]);
+            frm.set_df_property(fieldname, 'hidden', 0);
         }
     });
 
-    // 2. Set Collapsed state for specific sections
+    // 2. Hide all extra tabs
+    const tabs_to_hide = [
+        'custom_amazon_fields',
+        'custom_item_images',
+        'dashboard_tab',
+        'variants_section',
+        'accounting',
+        'uom_tab',
+        'purchasing_tab',
+        'sales_details',
+        'item_tax_section_break',
+        'quality_tab',
+        'manufacturing',
+        'custom_supplier_history_tab'
+    ];
+
+    tabs_to_hide.forEach(tab_name => {
+        if (frm.fields_dict[tab_name]) {
+            frm.set_df_property(tab_name, 'hidden', 1);
+        }
+    });
+
+    // 3. Set Collapsed state for specific sections
     const collapsed_sections = [
         'sec_performance',
         'sec_amazon_benchmark',
@@ -323,6 +346,7 @@ function setup_4_tab_structure(frm) {
         }
     });
 }
+
 
 
 
