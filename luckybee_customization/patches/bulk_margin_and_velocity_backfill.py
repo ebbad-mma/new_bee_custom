@@ -1,29 +1,64 @@
-import os
-import json
 import frappe
-from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from luckybee_customization.jobs import refresh_velocity
 from luckybee_customization.item_hooks import calculate_margins
+
+# Map of our custom field names to their correct varchar lengths
+FIELD_LENGTHS = {
+    "custom_fsn_no": 30,
+    "custom_box_number": 30,
+    "custom_item_detail": 50,
+    "custom_asin_no": 30,
+    "custom_barcode": 30,
+    "custom_luckybee_brand": 40,
+    "custom_group": 40,
+    "lb_category_type": 30,
+    "lb_sub_category": 40,
+    "custom_legacy_barcode": 30,
+    "lb_data_status": 40,
+    "lb_velocity_band": 30,
+    "lb_lot_ref": 40,
+    "amz_data_status": 40,
+}
 
 def execute():
     """
     Patch 4: Bulk Margin & Velocity Backfill
-    Executes initial catalog-wide velocity scoring job and recalculates margin fields
-    for all stock items on Frappe Cloud setup.
-    Idempotent: Safe to re-run; scoring and margin formulas produce deterministic results.
+    - Fixes MariaDB row-size-too-large (1118) by shrinking varchar columns
+    - Adds missing velocity/margin columns individually
+    - Updates Custom Field records so sync_all does not re-expand them
+    - Runs velocity scoring and margin calculation
     """
     print("Executing Patch: bulk_margin_and_velocity_backfill...")
 
-    # 0. Ensure ROW_FORMAT=DYNAMIC on tabItem to prevent MariaDB row size too large error (1118)
+    # ── Step 0: Set ROW_FORMAT=DYNAMIC on tabItem ──────────────────────
     try:
-        frappe.db.sql("ALTER TABLE `tabItem` ROW_FORMAT=DYNAMIC ENGINE=InnoDB;")
+        frappe.db.sql("ALTER TABLE `tabItem` ROW_FORMAT=DYNAMIC;")
     except Exception as e:
-        print(f"Notice: ALTER TABLE ROW_FORMAT=DYNAMIC: {e}")
+        print(f"Notice (ROW_FORMAT): {e}")
 
-    # 1. Add missing columns directly to DB table tabItem individually via raw SQL
-    existing_columns = frappe.db.get_table_columns("Item") or []
+    # ── Step 1: Shrink existing oversized varchar columns in tabItem ───
+    existing_cols = frappe.db.get_table_columns("Item") or []
+    for col, length in FIELD_LENGTHS.items():
+        if col in existing_cols:
+            try:
+                frappe.db.sql(f"ALTER TABLE `tabItem` MODIFY `{col}` varchar({length});")
+            except Exception as ex:
+                print(f"Notice (shrink {col}): {ex}")
 
-    fields_to_add_sql = [
+    # ── Step 2: Update Custom Field records in DB to match lengths ─────
+    #    This prevents sync_all -> updatedb from generating
+    #    MODIFY varchar(140) queries that blow the 65535 row limit.
+    for fieldname, length in FIELD_LENGTHS.items():
+        frappe.db.sql(
+            "UPDATE `tabCustom Field` SET `length` = %s "
+            "WHERE `dt` = 'Item' AND `fieldname` = %s AND (`length` = 0 OR `length` IS NULL)",
+            (length, fieldname)
+        )
+
+    frappe.db.commit()
+
+    # ── Step 3: Add missing velocity/margin columns individually ───────
+    new_columns = [
         ("lb_units_30d", "int(11) NOT NULL DEFAULT 0"),
         ("lb_units_90d", "int(11) NOT NULL DEFAULT 0"),
         ("lb_units_180d", "int(11) NOT NULL DEFAULT 0"),
@@ -36,46 +71,36 @@ def execute():
         ("lb_margin_pct", "decimal(21,9) DEFAULT NULL"),
         ("amz_delta_pct", "decimal(21,9) DEFAULT NULL"),
         ("mrp_discount_pct", "decimal(21,9) DEFAULT NULL"),
-        ("lb_velocity_band", "varchar(40) DEFAULT NULL"),
+        ("lb_velocity_band", "varchar(30) DEFAULT NULL"),
         ("lb_data_status", "varchar(40) DEFAULT NULL"),
         ("amz_data_status", "varchar(40) DEFAULT NULL"),
         ("lb_sub_category", "varchar(40) DEFAULT NULL"),
-        ("lb_category_type", "varchar(40) DEFAULT NULL"),
+        ("lb_category_type", "varchar(30) DEFAULT NULL"),
         ("lb_lot_ref", "varchar(40) DEFAULT NULL"),
-        ("custom_legacy_barcode", "varchar(40) DEFAULT NULL"),
+        ("custom_legacy_barcode", "varchar(30) DEFAULT NULL"),
         ("lb_primary_image", "text DEFAULT NULL"),
         ("lb_mrp_confirmed", "tinyint(4) NOT NULL DEFAULT 0"),
         ("amz_last_synced", "date DEFAULT NULL"),
-        ("lb_received_captured_on", "date DEFAULT NULL")
+        ("lb_received_captured_on", "date DEFAULT NULL"),
     ]
 
-    for fname, fsql in fields_to_add_sql:
-        if fname not in existing_columns:
+    for fname, fsql in new_columns:
+        if fname not in existing_cols:
             try:
                 frappe.db.sql(f"ALTER TABLE `tabItem` ADD COLUMN `{fname}` {fsql};")
             except Exception as ex:
-                print(f"Warning adding column {fname} via SQL: {ex}")
+                print(f"Notice (add {fname}): {ex}")
 
     frappe.db.commit()
 
-    # 2. Ensure Custom Field DocType records exist for Desk forms UI
-    try:
-        fixture_path = frappe.get_app_path("luckybee_customization", "fixtures", "custom_field.json")
-        if os.path.exists(fixture_path):
-            with open(fixture_path, "r") as f:
-                custom_fields_list = json.load(f)
-            item_fields = [df for df in custom_fields_list if df.get("dt") == "Item"]
-            if item_fields:
-                create_custom_fields({"Item": item_fields}, ignore_validate=True)
-                frappe.db.commit()
-    except Exception as e:
-        print(f"Notice: Syncing custom fields: {e}")
-
-    # 3. Run Nightly Product Velocity Scoring Job
+    # ── Step 4: Run velocity scoring ───────────────────────────────────
     refresh_velocity()
 
-    # 4. Bulk Recalculate Margins across all Stock Items
-    items = frappe.get_all("Item", filters={"is_stock_item": 1}, fields=["name", "last_purchase_rate", "custom_mrp", "valuation_rate", "last_price"])
+    # ── Step 5: Bulk recalculate margins ───────────────────────────────
+    items = frappe.get_all(
+        "Item", filters={"is_stock_item": 1},
+        fields=["name", "last_purchase_rate", "custom_mrp", "valuation_rate", "last_price"],
+    )
     print(f"Recalculating margin fields for {len(items)} stock items...")
 
     updated_count = 0
@@ -84,10 +109,9 @@ def execute():
         frappe.db.set_value("Item", item.name, {
             "lb_margin_pct": item.lb_margin_pct,
             "amz_delta_pct": item.amz_delta_pct,
-            "mrp_discount_pct": item.mrp_discount_pct
+            "mrp_discount_pct": item.mrp_discount_pct,
         }, update_modified=False)
         updated_count += 1
-
         if (idx + 1) % 500 == 0:
             frappe.db.commit()
 
