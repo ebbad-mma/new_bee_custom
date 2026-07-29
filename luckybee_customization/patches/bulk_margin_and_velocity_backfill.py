@@ -16,43 +16,45 @@ def execute():
 
     # 0. Ensure ROW_FORMAT=DYNAMIC on tabItem to prevent MariaDB row size too large error (1118)
     try:
-        frappe.db.sql("ALTER TABLE `tabItem` ROW_FORMAT=DYNAMIC;")
+        frappe.db.sql("ALTER TABLE `tabItem` ROW_FORMAT=DYNAMIC ENGINE=InnoDB;")
     except Exception as e:
         print(f"Notice: ALTER TABLE ROW_FORMAT=DYNAMIC: {e}")
 
-    # 1. Add missing columns directly to DB table tabItem individually
-    fields_to_add = [
-        ("lb_units_30d", "Int"),
-        ("lb_units_90d", "Int"),
-        ("lb_units_180d", "Int"),
-        ("lb_units_365d", "Int"),
-        ("lb_days_cover", "Int"),
-        ("lb_days_since_sale", "Int"),
-        ("lb_days_since_receipt", "Int"),
-        ("lb_stock_value", "Currency"),
-        ("lb_sell_through", "Float"),
-        ("lb_margin_pct", "Float"),
-        ("amz_delta_pct", "Float"),
-        ("mrp_discount_pct", "Float"),
-        ("lb_velocity_band", "Data"),
-        ("lb_data_status", "Data"),
-        ("amz_data_status", "Data"),
-        ("lb_sub_category", "Link"),
-        ("lb_category_type", "Data"),
-        ("lb_lot_ref", "Data"),
-        ("custom_legacy_barcode", "Data"),
-        ("lb_primary_image", "Text"),
-        ("lb_mrp_confirmed", "Check"),
-        ("amz_last_synced", "Date"),
-        ("lb_received_captured_on", "Date")
+    # 1. Add missing columns directly to DB table tabItem individually via raw SQL
+    existing_columns = frappe.db.get_table_columns("Item") or []
+
+    fields_to_add_sql = [
+        ("lb_units_30d", "int(11) NOT NULL DEFAULT 0"),
+        ("lb_units_90d", "int(11) NOT NULL DEFAULT 0"),
+        ("lb_units_180d", "int(11) NOT NULL DEFAULT 0"),
+        ("lb_units_365d", "int(11) NOT NULL DEFAULT 0"),
+        ("lb_days_cover", "int(11) DEFAULT NULL"),
+        ("lb_days_since_sale", "int(11) DEFAULT NULL"),
+        ("lb_days_since_receipt", "int(11) DEFAULT NULL"),
+        ("lb_stock_value", "decimal(21,9) NOT NULL DEFAULT 0.0"),
+        ("lb_sell_through", "decimal(21,9) DEFAULT NULL"),
+        ("lb_margin_pct", "decimal(21,9) DEFAULT NULL"),
+        ("amz_delta_pct", "decimal(21,9) DEFAULT NULL"),
+        ("mrp_discount_pct", "decimal(21,9) DEFAULT NULL"),
+        ("lb_velocity_band", "varchar(40) DEFAULT NULL"),
+        ("lb_data_status", "varchar(40) DEFAULT NULL"),
+        ("amz_data_status", "varchar(40) DEFAULT NULL"),
+        ("lb_sub_category", "varchar(40) DEFAULT NULL"),
+        ("lb_category_type", "varchar(40) DEFAULT NULL"),
+        ("lb_lot_ref", "varchar(40) DEFAULT NULL"),
+        ("custom_legacy_barcode", "varchar(40) DEFAULT NULL"),
+        ("lb_primary_image", "text DEFAULT NULL"),
+        ("lb_mrp_confirmed", "tinyint(4) NOT NULL DEFAULT 0"),
+        ("amz_last_synced", "date DEFAULT NULL"),
+        ("lb_received_captured_on", "date DEFAULT NULL")
     ]
 
-    for fname, ftype in fields_to_add:
-        if not frappe.db.has_column("Item", fname):
+    for fname, fsql in fields_to_add_sql:
+        if fname not in existing_columns:
             try:
-                frappe.db.add_column("Item", fname, ftype)
+                frappe.db.sql(f"ALTER TABLE `tabItem` ADD COLUMN `{fname}` {fsql};")
             except Exception as ex:
-                print(f"Warning adding column {fname}: {ex}")
+                print(f"Warning adding column {fname} via SQL: {ex}")
 
     frappe.db.commit()
 
@@ -67,7 +69,7 @@ def execute():
                 create_custom_fields({"Item": item_fields}, ignore_validate=True)
                 frappe.db.commit()
     except Exception as e:
-        print(f"Warning in patch syncing custom fields: {e}")
+        print(f"Notice: Syncing custom fields: {e}")
 
     # 3. Run Nightly Product Velocity Scoring Job
     refresh_velocity()
