@@ -10,6 +10,7 @@ frappe.ui.form.on('Item', {
     },
     refresh(frm){
         render_velocity_dashboard(frm);
+        setup_4_tab_structure(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -288,6 +289,41 @@ function render_velocity_dashboard(frm) {
     frm.dashboard.wrapper.prepend(strip_html);
     frm.dashboard.show();
 }
+
+function setup_4_tab_structure(frm) {
+    // 1. Rename / format Tab Breaks
+    const tabs = {
+        'details': '1. Details',
+        'custom_pricing_margin_tab': '2. Pricing & Margin',
+        'custom_market_intelligence_tab': '3. Market Intelligence',
+        'custom_inventory_operations_tab': '4. Inventory & Operations'
+    };
+
+    Object.keys(tabs).forEach(fieldname => {
+        if (frm.fields_dict[fieldname]) {
+            frm.set_df_property(fieldname, 'label', tabs[fieldname]);
+        }
+    });
+
+    // 2. Set Collapsed state for specific sections
+    const collapsed_sections = [
+        'sec_performance',
+        'sec_amazon_benchmark',
+        'sec_supplier_history',
+        'sec_competitive_codes',
+        'sec_buying_selling',
+        'sec_dimensions',
+        'sec_tax_accounts'
+    ];
+
+    collapsed_sections.forEach(sec => {
+        if (frm.fields_dict[sec]) {
+            frm.set_df_property(sec, 'collapsible', 1);
+            frm.set_df_property(sec, 'collapsed', 1);
+        }
+    });
+}
+
 
 
 
