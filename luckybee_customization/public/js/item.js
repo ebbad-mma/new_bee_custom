@@ -9,8 +9,8 @@ frappe.ui.form.on('Item', {
     set_filter_in_subcat_on_the_basis_of_cat(frm)
     },
     refresh(frm){
+        move_connections_tab_to_end(frm);
         render_velocity_dashboard(frm);
-        setup_4_tab_structure(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -162,6 +162,15 @@ frappe.ui.form.on('Item', {
     }
 })
 
+function move_connections_tab_to_end(frm) {
+    const tabs = frm.page.wrapper.find('.form-tabs');
+    const connectionsTab = tabs.find("[data-fieldname='dashboard_tab']").closest('.nav-item');
+
+    if (connectionsTab.length) {
+        connectionsTab.appendTo(tabs);
+    }
+}
+
 
 
 
@@ -288,63 +297,6 @@ function render_velocity_dashboard(frm) {
 
     frm.dashboard.wrapper.prepend(strip_html);
     frm.dashboard.show();
-}
-
-function setup_4_tab_structure(frm) {
-    // 1. Rename the 4 primary tabs
-    const primary_tabs = {
-        'details': '1. Details',
-        'pricing_tab': '2. Pricing & Margin',
-        'keepa_description_feature': '3. Market Intelligence',
-        'inventory_section': '4. Inventory & Operations'
-    };
-
-    Object.keys(primary_tabs).forEach(fieldname => {
-        if (frm.fields_dict[fieldname]) {
-            frm.set_df_property(fieldname, 'label', primary_tabs[fieldname]);
-            frm.set_df_property(fieldname, 'hidden', 0);
-        }
-    });
-
-    // 2. Hide all extra tabs
-    const tabs_to_hide = [
-        'custom_amazon_fields',
-        'custom_item_images',
-        'dashboard_tab',
-        'variants_section',
-        'accounting',
-        'uom_tab',
-        'purchasing_tab',
-        'sales_details',
-        'item_tax_section_break',
-        'quality_tab',
-        'manufacturing',
-        'custom_supplier_history_tab'
-    ];
-
-    tabs_to_hide.forEach(tab_name => {
-        if (frm.fields_dict[tab_name]) {
-            frm.set_df_property(tab_name, 'hidden', 1);
-        }
-    });
-
-    // 3. Set Collapsed state for specific sections
-    const collapsed_sections = [
-        'sec_performance',
-        'sec_amazon_benchmark',
-        'sec_supplier_history',
-        'sec_competitive_codes',
-        'sec_buying_selling',
-        'sec_dimensions',
-        'sec_tax_accounts'
-    ];
-
-    collapsed_sections.forEach(sec => {
-        if (frm.fields_dict[sec]) {
-            frm.set_df_property(sec, 'collapsible', 1);
-            frm.set_df_property(sec, 'collapsed', 1);
-        }
-    });
 }
 
 

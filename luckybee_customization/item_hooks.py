@@ -27,8 +27,10 @@ def calculate_margins(doc, method=None):
 
     if selling and cost:
         doc.lb_margin_pct = round((selling - cost) / cost * 100.0, 2)
+        doc.lb_actual_cost = cost
     else:
         doc.lb_margin_pct = None
+        doc.lb_actual_cost = cost or None
 
     try:
         amz = float(doc.last_price) if doc.last_price else 0.0
