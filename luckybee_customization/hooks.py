@@ -268,17 +268,23 @@ doc_events = {
 fixtures = [
      {
         "dt": "Custom Field",
-        "filters": [
+        "or_filters": [
             [
                 "module", "in", ["luckybee_customization"]
+            ],
+            [
+                "dt", "=", "Item"
             ]
         ]
     },
      {
         "dt": "Property Setter",
-        "filters": [
+        "or_filters": [
             [
                 "module", "in", ["luckybee_customization"]
+            ],
+            [
+                "doc_type", "=", "Item"
             ]
         ]
     },
