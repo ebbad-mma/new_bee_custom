@@ -195,6 +195,21 @@ class TestMobileFoundation(unittest.TestCase):
         with self.assertRaises(frappe.PermissionError):
             item_doc.save(ignore_permissions=True)
 
+    def test_validate_role_field_permissions_owner_supervisor_bypass(self):
+        # Form 5 (All-in-one) relies on Owner-Supervisor being a full bypass role -
+        # confirm it can edit a field that's on NO individual staff role's whitelist
+        # (description isn't editable by Floor/Trusted/Matching/Stock-take Staff).
+        frappe.get_roles = lambda *args, **kwargs: ["Owner-Supervisor"]
+
+        item_doc = frappe.get_doc("Item", self.created_item_name)
+        item_doc.description = "Set by Owner-Supervisor via Form 5"
+        item_doc.custom_asin_no = "B0OWNERBYPASS"
+        item_doc.custom_mrp = 1234.0
+        try:
+            item_doc.save(ignore_permissions=True)
+        except frappe.PermissionError:
+            self.fail("validate_role_field_permissions raised PermissionError unexpectedly for Owner-Supervisor (bypass role)")
+
     def test_validate_role_field_permissions_desk_save_and_direct_save(self):
         # Simulate Floor Staff user
         frappe.get_roles = lambda *args, **kwargs: ["Floor Staff"]
