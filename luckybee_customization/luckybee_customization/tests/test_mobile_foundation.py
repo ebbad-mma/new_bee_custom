@@ -1,6 +1,7 @@
 import unittest
 import frappe
 from luckybee_customization.api.mobile_forms import find_item_for_mobile, fetch_keepa_photo
+from luckybee_customization.api.stock_recount import get_stock_recount_context, submit_stock_recount
 from luckybee_customization.item_hooks import validate_role_field_permissions
 
 class TestMobileFoundation(unittest.TestCase):
@@ -38,7 +39,16 @@ class TestMobileFoundation(unittest.TestCase):
         if hasattr(self, "created_item_name"):
             frappe.db.delete("Item Barcode", {"parent": self.created_item_name})
             frappe.db.delete("Item", {"name": self.created_item_name})
-            frappe.db.commit()
+
+        # Tests that set custom_asin_no trigger the real sync_keepa_item hook (it runs in
+        # before_save regardless of whether validate_role_field_permissions later blocks the
+        # save), which creates/reuses an "Item Details" row for that ASIN. Left uncleaned, that
+        # row's .item link points at this run's (now-deleted) item, and the next test run - which
+        # reuses the same hardcoded test ASIN - resaves that same stale row via
+        # frappe.db.exists({'asin_no': ...}) and hits a dangling Link validation error. Reproduced
+        # live (intermittent "Could not find Item: <name>" failures on repeat runs).
+        frappe.db.delete("Item Details", {"asin_no": ["in", ["B01NXYZ", "B0MATCHOK1"]]})
+        frappe.db.commit()
 
     def test_find_item_for_mobile(self):
         # 1. Test item not found
@@ -211,3 +221,114 @@ class TestMobileFoundation(unittest.TestCase):
 
         with self.assertRaises(frappe.PermissionError):
             item_doc.save(ignore_permissions=True)
+
+
+class TestStockRecount(unittest.TestCase):
+    """Form 4 (Stock-take Staff) - highest risk of the mobile forms since it writes
+    real stock via Stock Reconciliation. Uses real Stock Reconciliation submissions
+    against disposable test items/warehouses, not mocks."""
+
+    WAREHOUSE = "Stores - SR"
+    COMPANY = "Samyak Resources"
+
+    def setUp(self):
+        self.original_get_roles = frappe.get_roles
+        frappe.set_user("Administrator")
+
+        # This site's Item doctype autonames via naming_series (STOITEM.YYYY.), which
+        # overwrites both .name and .item_code on insert to the generated series value -
+        # whatever string is assigned to item_code beforehand is discarded. Must read the
+        # real identifier back from item.name after insert() rather than assume it.
+        item = frappe.new_doc("Item")
+        item.item_name = "Test Recount Item"
+        item.item_group = "All Item Groups"
+        item.stock_uom = "Nos"
+        item.is_stock_item = 1
+        item.insert(ignore_permissions=True)
+        self.item = item
+        self.item_code = item.name
+
+        serial_item = frappe.new_doc("Item")
+        serial_item.item_name = "Test Recount Serial Item"
+        serial_item.item_group = "All Item Groups"
+        serial_item.stock_uom = "Nos"
+        serial_item.is_stock_item = 1
+        serial_item.has_serial_no = 1
+        serial_item.serial_no_series = "TRSI-.####"
+        serial_item.insert(ignore_permissions=True)
+        self.serial_item_code = serial_item.name
+
+        # Establish a realistic baseline (qty + valuation), matching how a real item
+        # would already have stock before anyone ever recounts it - a from-zero
+        # reconciliation with no cost basis is a different, correctly-rejected case.
+        self.reco_docs = []
+        baseline = frappe.new_doc("Stock Reconciliation")
+        baseline.purpose = "Stock Reconciliation"
+        baseline.company = self.COMPANY
+        baseline.posting_date = frappe.utils.nowdate()
+        baseline.posting_time = frappe.utils.nowtime()
+        baseline.append("items", {"item_code": self.item_code, "warehouse": self.WAREHOUSE, "qty": 10, "valuation_rate": 50})
+        baseline.insert(ignore_permissions=True)
+        baseline.submit()
+        self.reco_docs.append(baseline.name)
+
+    def tearDown(self):
+        frappe.get_roles = self.original_get_roles
+        frappe.set_user("Administrator")
+
+        for name in frappe.get_all("Stock Reconciliation", filters={"name": ["in", self.reco_docs]}, pluck="name"):
+            doc = frappe.get_doc("Stock Reconciliation", name)
+            if doc.docstatus == 1:
+                doc.cancel()
+            frappe.delete_doc("Stock Reconciliation", name, force=True, ignore_permissions=True)
+
+        for code in [self.item_code, self.serial_item_code]:
+            if frappe.db.exists("Item", code):
+                frappe.delete_doc("Item", code, force=True, ignore_permissions=True)
+        frappe.db.delete("Bin", {"item_code": ["in", [self.item_code, self.serial_item_code]]})
+        frappe.db.commit()
+
+    def test_eligibility(self):
+        frappe.get_roles = lambda *args, **kwargs: ["Stock-take Staff"]
+
+        ctx = get_stock_recount_context(self.item_code)
+        self.assertTrue(ctx["is_eligible"])
+        warehouses = {w["warehouse"]: w["current_qty"] for w in ctx["warehouses"]}
+        self.assertEqual(warehouses.get(self.WAREHOUSE), 10.0)
+
+        serial_ctx = get_stock_recount_context(self.serial_item_code)
+        self.assertFalse(serial_ctx["is_eligible"])
+
+    def test_role_enforcement(self):
+        frappe.get_roles = lambda *args, **kwargs: ["Trusted Staff"]
+        with self.assertRaises(frappe.PermissionError):
+            submit_stock_recount(self.item_code, self.WAREHOUSE, 20)
+
+    def test_invalid_input_rejected(self):
+        frappe.get_roles = lambda *args, **kwargs: ["Stock-take Staff"]
+
+        with self.assertRaises(frappe.ValidationError):
+            submit_stock_recount(self.item_code, self.WAREHOUSE, -5)
+
+        with self.assertRaises(frappe.ValidationError):
+            submit_stock_recount(self.item_code, "Not A Real Warehouse", 5)
+
+        with self.assertRaises(frappe.ValidationError):
+            submit_stock_recount(self.serial_item_code, self.WAREHOUSE, 5)
+
+    def test_functional_recount(self):
+        frappe.get_roles = lambda *args, **kwargs: ["Stock-take Staff"]
+
+        result = submit_stock_recount(self.item_code, self.WAREHOUSE, 3)
+        self.assertEqual(result["status"], "success")
+        self.reco_docs.append(result["stock_reconciliation"])
+
+        bin_qty = frappe.db.get_value("Bin", {"item_code": self.item_code, "warehouse": self.WAREHOUSE}, "actual_qty")
+        self.assertEqual(bin_qty, 3.0)
+
+        # Same qty again - must not create a redundant Stock Reconciliation
+        no_op = submit_stock_recount(self.item_code, self.WAREHOUSE, 3)
+        self.assertEqual(no_op["status"], "no_change")
+
+        reco_count = frappe.db.count("Stock Reconciliation", {"name": ["in", self.reco_docs]})
+        self.assertEqual(reco_count, len(self.reco_docs))
