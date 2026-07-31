@@ -163,12 +163,16 @@ frappe.ui.form.on('Item', {
 })
 
 function move_connections_tab_to_end(frm) {
-    const tabs = frm.page.wrapper.find('.form-tabs');
-    const connectionsTab = tabs.find("[data-fieldname='dashboard_tab']").closest('.nav-item');
+    requestAnimationFrame(() => {
+        const tabs = frm.page.wrapper.find('.form-tabs');
+        const connectionsTab = tabs.find("[data-fieldname='dashboard_tab']").closest('.nav-item');
+        const connectionsPanel = frm.page.wrapper.find('#item-dashboard_tab');
 
-    if (connectionsTab.length) {
-        connectionsTab.appendTo(tabs);
-    }
+        if (connectionsTab.length) {
+            connectionsTab.removeClass('hide').addClass('show').appendTo(tabs);
+            connectionsPanel.removeClass('hide').addClass('show');
+        }
+    });
 }
 
 
@@ -298,7 +302,6 @@ function render_velocity_dashboard(frm) {
     frm.dashboard.wrapper.prepend(strip_html);
     frm.dashboard.show();
 }
-
 
 
 

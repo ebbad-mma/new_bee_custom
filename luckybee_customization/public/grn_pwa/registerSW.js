@@ -1,1 +1,0 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/assets/luckybee_customization//grn_pwa/sw.js', { scope: '/assets/luckybee_customization//grn_pwa/' })})}

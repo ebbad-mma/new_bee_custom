@@ -29,11 +29,13 @@ def jumble_string_by_word_subsets(input_string):
 	return list(jumbled_list)[:5]
 
 class ProductFinder(Document):
-	accesskey = '4i9vbmksc3d9o67p6fd3s9aitdaaer17c604f3qrh93auu67fnh6pfucqvqltmjm'
 	image_url = "https://images-na.ssl-images-amazon.com/images/I/"
 	
 	def validate(self):
-		api = keepa.Keepa(ProductFinder.accesskey, timeout=60)
+		accesskey = frappe.conf.get("keepa_api_key")
+		if not accesskey:
+			frappe.throw("Missing Keepa API key in site_config.json")
+		api = keepa.Keepa(accesskey, timeout=60)
 		product_params = {
 			"sort": [
 				[

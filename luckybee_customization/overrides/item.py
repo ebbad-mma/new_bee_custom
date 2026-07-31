@@ -6,10 +6,22 @@ from frappe import _
 import re
 from frappe.utils import today
 from .scraper_utils import scrape, set_images, extract_pid_with_regex
-					
+from luckybee_customization.item_hooks import mark_system_field_modified
 
 def sync_keepa_item(doc, event):
-	accesskey = '4i9vbmksc3d9o67p6fd3s9aitdaaer17c604f3qrh93auu67fnh6pfucqvqltmjm'
+	before_keepa_fields = {df.fieldname: doc.get(df.fieldname) for df in doc.meta.fields if df.fieldname}
+	try:
+		_sync_keepa_item_internal(doc, event)
+	finally:
+		for fieldname, before_val in before_keepa_fields.items():
+			if doc.get(fieldname) != before_val:
+				mark_system_field_modified(doc, fieldname)
+
+def _sync_keepa_item_internal(doc, event):
+	accesskey = frappe.conf.get("keepa_api_key")
+	if not accesskey:
+		frappe.log_error("Missing Keepa API key in site_config.json")
+		return
 	api = keepa.Keepa(accesskey)
 	if doc.custom_asin_no:
 		ASIN = [doc.custom_asin_no]
@@ -17,7 +29,7 @@ def sync_keepa_item(doc, event):
 			if not frappe.db.exists('Item Details', {'asin_no': doc.custom_asin_no}):
 				item_det = frappe.new_doc('Item Details')
 				item_det.asin_no = doc.custom_asin_no
-				item_det.save()
+				item_det.save(ignore_permissions=True)
 			if frappe.db.exists('Item Details', {'asin_no': doc.custom_asin_no}):
 				item_detail = frappe.get_doc('Item Details', {'asin_no': doc.custom_asin_no})
 			try:
@@ -35,8 +47,9 @@ def sync_keepa_item(doc, event):
 						if not frappe.db.exists('Brand', {'brand': brand_name}):
 							n_doc = frappe.new_doc('Brand')
 							n_doc.brand = brand_name
-							n_doc.insert()
+							n_doc.insert(ignore_permissions=True)
 						doc.brand = brand_name
+						mark_system_field_modified(doc, "brand")
 
 					images_csv = prod.get("imagesCSV")
 					images_list = []
@@ -53,10 +66,12 @@ def sync_keepa_item(doc, event):
 
 					if images_list:
 						doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
+						mark_system_field_modified(doc, "image")
 						for ind, image_name in enumerate(images_list):
 							field_name = f"custom_image{ind+1}"
 							image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
 							doc.set(field_name, image_url)
+							mark_system_field_modified(doc, field_name)
 
 					item_detail.manufacturer = prod.get("manufacturer")
 					listed_since = prod.get("listedSince")
@@ -85,8 +100,10 @@ def sync_keepa_item(doc, event):
 					if len(csv_data) > 0:
 						if len(csv_data) >= 18 and csv_data[17]:
 							doc.reviews_count = csv_data[17][-1]
+							mark_system_field_modified(doc, "reviews_count")
 						if len(csv_data) >= 17 and csv_data[16]:
 							doc.reviews_rating = str(csv_data[16][-1]/10)
+							mark_system_field_modified(doc, "reviews_rating")
 					
 					item_detail.parent_asin = prod.get("parentAsin")
 					category_tree = []
@@ -98,12 +115,16 @@ def sync_keepa_item(doc, event):
 					if category_tree:
 						doc.category_sub = category_tree[-1]
 						doc.categories_tree = ", ".join(category_tree)
+						mark_system_field_modified(doc, "category_sub")
+						mark_system_field_modified(doc, "categories_tree")
 					if category_tree_dict and prod.get('rootCategory'):
 						doc.category_root = category_tree_dict.get(prod.get('rootCategory'))
+						mark_system_field_modified(doc, "category_root")
 
 					ean_list = prod.get('eanList')
 					if ean_list:
 						doc.ean = ean_list[0]
+						mark_system_field_modified(doc, "ean")
 
 					if prod.get('upcList') is not None:
 						item_detail.product_codes_upc = json.dumps(prod.get('upcList'))
@@ -153,7 +174,7 @@ def sync_keepa_item(doc, event):
 						item_detail.item_breadth = str(item_w / 10)
 						item_detail.item_height = str(item_h / 10)
 						item_dimension = str((item_l / 10) * (item_w / 10) * (item_h / 10))
-						if (item_l / 10) > 0 and (item_w / 10) > 0 and (item_h / 10) > 0:
+						if (item_l / 10) > 0 and (item_l / 10) > 0 and (item_w / 10) > 0:
 							item_detail.length_dimension = f"{item_detail.item_length} x {item_detail.item_breadth} x {item_detail.item_height} cm (= {item_dimension} cm\u00b3)"
 					
 					item_detail.item_weight = prod.get('itemWeight')
@@ -162,14 +183,17 @@ def sync_keepa_item(doc, event):
 					item_detail.desc_feature = prod.get("description") or ""
 					if hasattr(doc, "desc_feature"):
 						doc.desc_feature = prod.get("description") or ""
+						mark_system_field_modified(doc, "desc_feature")
 					item_detail.title = prod.get("title") or ""
 					doc.title = prod.get("title") or ""
+					mark_system_field_modified(doc, "title")
 					
 					features = prod.get('features') or []
 					for f_idx in range(min(5, len(features))):
 						setattr(item_detail, f"desc_feature{f_idx+1}", features[f_idx])
 						if hasattr(doc, f"desc_feature_{f_idx+1}"):
 							setattr(doc, f"desc_feature_{f_idx+1}", features[f_idx])
+							mark_system_field_modified(doc, f"desc_feature_{f_idx+1}")
 
 					stats_parsed = prod.get("stats_parsed")
 					if stats_parsed:
@@ -183,6 +207,8 @@ def sync_keepa_item(doc, event):
 							item_detail.sales_rank_current_price = current.get("SALES")
 							doc.last_price = current.get("LISTPRICE")
 							doc.custom_new_current = current.get("NEW")
+							mark_system_field_modified(doc, "last_price")
+							mark_system_field_modified(doc, "custom_new_current")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -211,7 +237,7 @@ def sync_keepa_item(doc, event):
 								doc.list_price_highest = highest_listprice[1]
 				if doc.ean:
 					item_detail.ean = doc.ean
-				item_detail.save()
+				item_detail.save(ignore_permissions=True)
 				doc.custom_item_detail = item_detail.name
 
 	elif doc.ean:
@@ -221,7 +247,7 @@ def sync_keepa_item(doc, event):
 				if not frappe.db.exists('Item Details', {'ean': doc.ean}):
 					item_det = frappe.new_doc('Item Details')
 					item_det.ean = doc.ean
-					item_det.save()
+					item_det.save(ignore_permissions=True)
 			if frappe.db.exists('Item Details', {'ean': doc.ean}):
 				item_detail = frappe.get_doc('Item Details', {'ean': doc.ean})
 			try:
@@ -243,7 +269,7 @@ def sync_keepa_item(doc, event):
 						if not frappe.db.exists('Brand', {'brand': brand_name}):
 							n_doc = frappe.new_doc('Brand')
 							n_doc.brand = brand_name
-							n_doc.insert()
+							n_doc.insert(ignore_permissions=True)
 						doc.brand = brand_name
 					else:
 						doc.brand = brand_name
@@ -278,16 +304,18 @@ def sync_keepa_item(doc, event):
 							sales_rank_history = sales_ranks[str(sales_rank_reference)]
 							if sales_rank_history:
 								item_detail.sales_rank = str(sales_rank_history[-1])
-					item_detail.sales_rank_reference = sales_rank_reference
 					doc.custom_asin_no = prod.get("asin") or doc.custom_asin_no
+					mark_system_field_modified(doc, "custom_asin_no")
 					item_detail.url_amazon = f'https://www.amazon.in/dp/{doc.custom_asin_no}'
 					
 					csv_data = prod.get('csv') or []
 					if len(csv_data) > 0:
 						if len(csv_data) >= 18 and csv_data[17]:
 							doc.reviews_count = csv_data[17][-1]
+							mark_system_field_modified(doc, "reviews_count")
 						if len(csv_data) >= 17 and csv_data[16]:
 							doc.reviews_rating = str(csv_data[16][-1]/10)
+							mark_system_field_modified(doc, "reviews_rating")
 					
 					item_detail.parent_asin = prod.get("parentAsin")
 					category_tree = []
@@ -299,12 +327,16 @@ def sync_keepa_item(doc, event):
 					if category_tree:
 						doc.category_sub = category_tree[-1]
 						doc.categories_tree = ", ".join(category_tree)
+						mark_system_field_modified(doc, "category_sub")
+						mark_system_field_modified(doc, "categories_tree")
 					if category_tree_dict and prod.get('rootCategory'):
 						doc.category_root = category_tree_dict.get(prod.get('rootCategory'))
+						mark_system_field_modified(doc, "category_root")
 					
 					ean_list = prod.get('eanList')
-					if ean_list:
+					if ean_list and not doc.ean:
 						doc.ean = ean_list[0]
+						mark_system_field_modified(doc, "ean")
 
 					if prod.get('upcList') is not None:
 						item_detail.product_codes_upc = json.dumps(prod.get('upcList'))
@@ -359,6 +391,7 @@ def sync_keepa_item(doc, event):
 					item_detail.desc_feature = prod.get("description") or ""
 					item_detail.title = prod.get("title") or ""
 					doc.title = prod.get("title") or ""
+					mark_system_field_modified(doc, "title")
 
 					features = prod.get('features') or []
 					for f_idx in range(min(5, len(features))):
@@ -405,7 +438,7 @@ def sync_keepa_item(doc, event):
 
 					if doc.custom_asin_no:
 						item_detail.asin_no = doc.custom_asin_no
-					item_detail.save()
+					item_detail.save(ignore_permissions=True)
 				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 	
 	elif doc.custom_url or doc.custom_fsn_no:
@@ -422,7 +455,7 @@ def sync_keepa_item(doc, event):
 				item_det = frappe.new_doc('Item Details')
 				item_det.url = doc.custom_url
 				item_det.fsn_no = doc.custom_fsn_no
-				item_det.save()
+				item_det.save(ignore_permissions=True)
 			if frappe.db.exists('Item Details', {'fsn_no': doc.custom_fsn_no}):
 				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.custom_fsn_no})
 
@@ -446,7 +479,7 @@ def sync_keepa_item(doc, event):
 			if category not in category_names:
 				cat = frappe.new_doc("Item Category")
 				cat.category_name = category
-				cat.insert()
+				cat.insert(ignore_permissions=True)
 				item_detail.append("item_groups", {
 					'item_group': cat.name
 				})
@@ -473,6 +506,6 @@ def sync_keepa_item(doc, event):
 		item_detail.fsn_no = doc.custom_fsn_no
 		item_detail.flipkart_dis_per =data['discount']
 		item_detail.spec_html_data = str(data['general'])
-		item_detail.save()
+		item_detail.save(ignore_permissions=True)
 		doc.custom_item_detail=item_detail.name
 

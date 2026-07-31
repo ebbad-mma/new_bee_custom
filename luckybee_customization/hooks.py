@@ -237,6 +237,7 @@ doc_events = {
 		"before_save": [
 			"luckybee_customization.overrides.item.sync_keepa_item",
 			"luckybee_customization.item_hooks.calculate_margins",
+			"luckybee_customization.item_hooks.validate_role_field_permissions",
 			"luckybee_customization.receiving.recompute_status"
 		],
 		"on_update": "luckybee_customization.overrides.item_utils.check_image"
@@ -291,7 +292,11 @@ fixtures = [
      {
         "dt": "Amazon Pricing Rule"
         
-    }
+    },
+      {
+        "dt": "Web Form",
+        "filters": [
+            ["name", "in", ["photos-floor-staff", "product-info-trusted-staff", "asin-matching-staff", "count-stock-take-staff", "all-in-one-owner-supervisor"]]
+        ]
+      }
     ]
-
-website_route_rules = [{'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'}, {'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'}, {'from_route': '/grn_pwa/<path:app_path>', 'to_route': 'grn_pwa'},]
