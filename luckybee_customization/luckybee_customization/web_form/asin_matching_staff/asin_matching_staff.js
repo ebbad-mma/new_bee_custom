@@ -1,7 +1,14 @@
 frappe.ready(function() {
     $.getScript("/assets/luckybee_customization/js/mobile_preview.js");
 
+    // The field's DOM element may not exist yet at frappe.ready time on a real
+    // device/network (confirmed live elsewhere in these forms - see Form 4's
+    // fix for the same class of timing race). setup_asin_live_preview() is
+    // idempotent (bails out if its panel already exists), so retrying is safe.
     setup_asin_live_preview();
+    setTimeout(setup_asin_live_preview, 300);
+    setTimeout(setup_asin_live_preview, 800);
+    setTimeout(setup_asin_live_preview, 1500);
 
     function setup_asin_live_preview() {
         const $asinField = $('[data-fieldname="custom_asin_no"]');

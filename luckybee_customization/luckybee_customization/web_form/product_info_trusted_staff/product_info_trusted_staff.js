@@ -8,6 +8,13 @@ frappe.ready(function() {
     } else {
         setup_ean_camera_scanner();
     }
+    // The field's DOM element may not exist yet at frappe.ready time on a real
+    // device/network (confirmed live elsewhere in these forms - see Form 4's
+    // fix for the same class of timing race). setup_ean_camera_scanner() is
+    // idempotent (bails out if its button already exists), so retrying is safe.
+    setTimeout(setup_ean_camera_scanner, 300);
+    setTimeout(setup_ean_camera_scanner, 800);
+    setTimeout(setup_ean_camera_scanner, 1500);
 
     function setup_ean_camera_scanner() {
         const $eanField = $('[data-fieldname="ean"]');

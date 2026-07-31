@@ -1,9 +1,31 @@
 frappe.ready(function() {
     $.getScript("/assets/luckybee_customization/js/mobile_preview.js");
 
+    // These fields' DOM elements may not exist yet at frappe.ready time on a
+    // real device/network. Both setup functions are idempotent (bail out once
+    // their UI already exists), so retrying is safe.
     setup_ean_camera_scanner();
+    setTimeout(setup_ean_camera_scanner, 300);
+    setTimeout(setup_ean_camera_scanner, 800);
+    setTimeout(setup_ean_camera_scanner, 1500);
+
     setup_asin_live_preview();
+    setTimeout(setup_asin_live_preview, 300);
+    setTimeout(setup_asin_live_preview, 800);
+    setTimeout(setup_asin_live_preview, 1500);
+
+    // frappe.web_form.doc loads asynchronously and is frequently not populated
+    // yet when frappe.ready fires (reproduced live on Form 4, which has the
+    // identical guard clause: the page silently rendered nothing but the bare
+    // Save/Discard form). Retry on a timer rather than a single attempt. Not
+    // using frappe.web_form.after_load here - mobile_preview.js (loaded above
+    // via getScript, so it may not have run yet at this point) claims that same
+    // hook for its own photo panel, and assigning to it here would race with
+    // and potentially clobber that assignment depending on load order.
     setup_optional_stock_count();
+    setTimeout(setup_optional_stock_count, 300);
+    setTimeout(setup_optional_stock_count, 800);
+    setTimeout(setup_optional_stock_count, 1500);
 
     // --- EAN camera scanner (same behavior as Form 2 / Trusted Staff) ---
     function setup_ean_camera_scanner() {
@@ -206,7 +228,7 @@ frappe.ready(function() {
 
     // --- Optional stock count (off by default - leaving it blank does nothing to stock) ---
     function setup_optional_stock_count() {
-        if (!frappe.web_form || !frappe.web_form.doc) return;
+        if (!frappe.web_form || !frappe.web_form.doc || !frappe.web_form.doc.name) return;
         if ($('#stock-count-panel').length) return;
 
         const itemCode = frappe.web_form.doc.name;

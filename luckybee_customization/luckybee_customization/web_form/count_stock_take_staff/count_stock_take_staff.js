@@ -1,8 +1,20 @@
 frappe.ready(function() {
+    // frappe.web_form.doc loads asynchronously - it is frequently NOT populated
+    // yet when frappe.ready fires (confirmed live: on a real device the page
+    // rendered only the bare, empty Save/Discard form with no Stock Count panel
+    // at all, because this ran once, found doc undefined, and silently gave up).
+    // Mirror mobile_preview.js's belt-and-suspenders approach: try via the
+    // after_load hook (fires once the doc genuinely has loaded) AND via timed
+    // retries as a fallback, since this form doesn't share that hook with
+    // anything else that could clobber it.
+    frappe.web_form.after_load = setup_stock_count_ui;
     setup_stock_count_ui();
+    setTimeout(setup_stock_count_ui, 300);
+    setTimeout(setup_stock_count_ui, 800);
+    setTimeout(setup_stock_count_ui, 1500);
 
     function setup_stock_count_ui() {
-        if (!frappe.web_form || !frappe.web_form.doc) return;
+        if (!frappe.web_form || !frappe.web_form.doc || !frappe.web_form.doc.name) return;
         if ($('#stock-count-panel').length) return;
 
         const itemCode = frappe.web_form.doc.name;
