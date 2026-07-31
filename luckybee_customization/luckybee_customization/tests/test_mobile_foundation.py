@@ -99,38 +99,33 @@ class TestMobileFoundation(unittest.TestCase):
         frappe.get_roles = lambda *args, **kwargs: ["Floor Staff"]
 
         item_doc = frappe.get_doc("Item", self.created_item_name)
-        
-        # Simulate incoming web request payload (Floor Staff submitted lb_primary_image only)
-        import json
-        frappe.form_dict = frappe._dict({
-            "doc": json.dumps({
-                "name": self.created_item_name,
-                "lb_primary_image": "https://example.com/floor_photo.jpg"
-            })
-        })
 
         # Floor staff updates allowed field lb_primary_image
         item_doc.lb_primary_image = "https://example.com/floor_photo.jpg"
 
-        # Simulate sync_keepa_item running in before_save and updating title + custom_luckybee_brand on doc
+        # Simulate sync_keepa_item running in before_save and updating title + brand on doc,
+        # exactly as the real hook does: it mutates the field AND calls
+        # mark_system_field_modified so validate_role_field_permissions knows this change
+        # wasn't made by the saving user. (There is no reliable way to infer "was this field
+        # submitted by the client" from frappe.form_dict - Web Form saves never populate a
+        # "doc" key there - so mark_system_field_modified is the only exemption mechanism.)
+        from luckybee_customization.item_hooks import mark_system_field_modified
         item_doc.title = "Keepa Synced Product Title"
-        item_doc.custom_luckybee_brand = "Keepa LB Brand"
+        mark_system_field_modified(item_doc, "title")
+        if not frappe.db.exists("Brand", "Keepa Test Brand"):
+            frappe.get_doc({"doctype": "Brand", "brand": "Keepa Test Brand"}).insert(ignore_permissions=True)
+        item_doc.brand = "Keepa Test Brand"
+        mark_system_field_modified(item_doc, "brand")
 
-        # Save document - should NOT throw PermissionError for Keepa's title/brand changes because Floor Staff only submitted lb_primary_image
+        # Save document - should NOT throw PermissionError for Keepa's title/brand changes because
+        # they're marked as system-modified, even though Floor Staff isn't allowed to edit them directly
         try:
             item_doc.save(ignore_permissions=True)
         except frappe.PermissionError as e:
             self.fail(f"False PermissionError triggered by server hook modification: {e}")
 
-        # Now simulate Floor Staff illegitimately adding custom_mrp to their submitted request payload
-        frappe.form_dict = frappe._dict({
-            "doc": json.dumps({
-                "name": self.created_item_name,
-                "lb_primary_image": "https://example.com/floor_photo.jpg",
-                "custom_mrp": 888.0
-            })
-        })
-        frappe.clear_cache(doctype="Item")
+        # Now simulate Floor Staff illegitimately modifying custom_mrp themselves (not hook-driven,
+        # not marked system-modified) - the whitelist must still block this
         item_doc = frappe.get_doc("Item", self.created_item_name)
         item_doc.lb_primary_image = "https://example.com/floor_photo.jpg"
         item_doc.custom_mrp = 888.0
