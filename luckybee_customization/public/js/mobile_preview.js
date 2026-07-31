@@ -4,7 +4,12 @@ window.render_mobile_media_preview = function() {
     if ($('#mobile-media-preview').length) return; // Already rendered
 
     const itemCode = frappe.web_form.doc.name;
-    const $form = $('.web-form-wrapper form');
+    // Frappe's actual template nests .web-form-wrapper INSIDE <form class="web-form">,
+    // not the other way around (form.web-form > .web-form-body > .web-form-wrapper,
+    // plus a sibling .web-form-footer with the Save/Discard buttons) - the old
+    // ".web-form-wrapper form" selector matched nothing on any form, ever. Confirmed
+    // live: the media preview panel never actually appeared on a real device.
+    const $form = $('form.web-form');
     if (!$form.length) return;
 
     // Inject a container above the form

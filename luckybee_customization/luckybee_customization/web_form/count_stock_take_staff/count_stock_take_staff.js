@@ -18,7 +18,11 @@ frappe.ready(function() {
         if ($('#stock-count-panel').length) return;
 
         const itemCode = frappe.web_form.doc.name;
-        const $form = $('.web-form-wrapper form');
+        // Frappe's actual template nests .web-form-wrapper INSIDE <form class="web-form">,
+        // not the other way around - ".web-form-wrapper form" matches nothing on any
+        // form, ever. Confirmed live: this was the real reason nothing rendered at all,
+        // not (only) the async-timing race the retries above also guard against.
+        const $form = $('form.web-form');
         if (!$form.length) return;
 
         // This form never edits the Item doc itself (Stock-take Staff has no
