@@ -111,3 +111,58 @@ def fetch_keepa_photo(item_code):
     except Exception as e:
         frappe.log_error(f"Keepa fetch failed for {asin}: {e}")
     return None
+
+@frappe.whitelist(allow_guest=True)
+def fetch_keepa_preview(asin):
+    """Live photo+price preview for a raw (possibly unsaved) ASIN string.
+
+    Used by the ASIN Matching Staff form so staff can confirm a match before
+    saving. Must never throw - a slow/down Keepa should degrade to an empty
+    preview, not block the save.
+    """
+    if not frappe.session.user or frappe.session.user == "Guest":
+        return {"image": None, "price": None, "title": None}
+
+    asin = (asin or "").strip()
+    if not asin:
+        return {"image": None, "price": None, "title": None}
+
+    accesskey = frappe.conf.get("keepa_api_key")
+    if not accesskey:
+        return {"image": None, "price": None, "title": None}
+
+    image = None
+    price = None
+    title = None
+    try:
+        api = keepa.Keepa(accesskey)
+        products = api.query([asin], stats=30, rating=True, update=0, domain="IN", history=1)
+        if products and isinstance(products, list) and len(products) > 0:
+            prod = products[0]
+            if isinstance(prod, dict):
+                images_csv = prod.get("imagesCSV")
+                if images_csv:
+                    images_list = [img.strip() for img in images_csv.split(',') if img.strip()]
+                    if images_list:
+                        image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
+                elif prod.get("images"):
+                    for img_obj in prod["images"]:
+                        if isinstance(img_obj, dict):
+                            img_file = img_obj.get("l") or img_obj.get("m")
+                            if img_file:
+                                image = "https://images-na.ssl-images-amazon.com/images/I/" + img_file
+                                break
+                        elif isinstance(img_obj, str) and img_obj.strip():
+                            image = "https://images-na.ssl-images-amazon.com/images/I/" + img_obj.strip()
+                            break
+
+                title = prod.get("title")
+
+                stats_parsed = prod.get("stats_parsed")
+                if stats_parsed:
+                    current = stats_parsed.get("current") or {}
+                    price = current.get("LISTPRICE") or current.get("NEW")
+    except Exception as e:
+        frappe.log_error(f"Keepa preview fetch failed for {asin}: {e}")
+
+    return {"image": image, "price": price, "title": title}

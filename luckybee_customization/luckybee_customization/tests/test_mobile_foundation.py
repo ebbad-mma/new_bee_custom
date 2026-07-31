@@ -166,6 +166,25 @@ class TestMobileFoundation(unittest.TestCase):
         with self.assertRaises(frappe.PermissionError):
             item_doc.save(ignore_permissions=True)
 
+    def test_validate_role_field_permissions_matching_staff(self):
+        frappe.get_roles = lambda *args, **kwargs: ["Matching Staff"]
+
+        item_doc = frappe.get_doc("Item", self.created_item_name)
+
+        # Modify custom_asin_no (allowed for Matching Staff) - should not throw
+        item_doc.custom_asin_no = "B0MATCHOK1"
+        try:
+            item_doc.save(ignore_permissions=True)
+        except frappe.PermissionError:
+            self.fail("validate_role_field_permissions raised PermissionError unexpectedly for Matching Staff modifying custom_asin_no")
+
+        # Reload a fresh copy from DB
+        item_doc = frappe.get_doc("Item", self.created_item_name)
+        # Modify custom_mrp (forbidden for Matching Staff) - should throw PermissionError
+        item_doc.custom_mrp = 400.0
+        with self.assertRaises(frappe.PermissionError):
+            item_doc.save(ignore_permissions=True)
+
     def test_validate_role_field_permissions_desk_save_and_direct_save(self):
         # Simulate Floor Staff user
         frappe.get_roles = lambda *args, **kwargs: ["Floor Staff"]
