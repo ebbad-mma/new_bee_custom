@@ -3,6 +3,18 @@ from frappe.utils import cint
 from woocommerce import API
 
 from luckybee_customization.woocommerce.publish_item import get_woocommerce_settings,make_slug_to_find_category,get_or_create_category
+def get_linked_item_details(doc, identifier_filter):
+	# Prefer the Item Details record already linked to this item (item is unique on Item Details).
+	# Looking up by identifier (ean/asin_no/fsn_no) first and blindly repointing .item onto it can
+	# collide with a different record that's already linked to this item, raising a raw MySQL
+	# IntegrityError instead of updating the right row.
+	existing_for_item = frappe.db.get_value('Item Details', {'item': doc.name})
+	if existing_for_item:
+		return frappe.get_doc('Item Details', existing_for_item)
+	if frappe.db.exists('Item Details', identifier_filter):
+		return frappe.get_doc('Item Details', identifier_filter)
+	return None
+
 def check_image(doc,method=None):
 	# if not doc.custom_image1 and not doc.custom_image2 and not doc.custom_image3 and not doc.custom_image4 and not doc.custom_image5:
 	#     image_list=doc.custom_image_list
@@ -14,20 +26,23 @@ def check_image(doc,method=None):
 	#create item details
 	update_stock_in_hand_in_item_master(doc)
 	if doc.custom_asin_no:
-		if frappe.db.exists('Item Details', {'asin_no': doc.custom_asin_no}):
-			item_details = frappe.get_doc('Item Details', {'asin_no': doc.custom_asin_no})
+		item_details = get_linked_item_details(doc, {'asin_no': doc.custom_asin_no})
+		if item_details:
 			item_details.amazon_item_url = f"https://www.amazon.in/dp/{doc.custom_asin_no}"
+			item_details.asin_no = doc.custom_asin_no
 			item_details.item = doc.name
 			item_details.save(ignore_permissions=True)
 	elif doc.ean:
-		if frappe.db.exists('Item Details', {'ean': doc.ean}):
-			item_details = frappe.get_doc('Item Details', {'ean': doc.ean})
+		item_details = get_linked_item_details(doc, {'ean': doc.ean})
+		if item_details:
+			item_details.ean = doc.ean
 			item_details.item = doc.name
 			item_details.save(ignore_permissions=True)
 	elif doc.custom_fsn_no:
-		if frappe.db.exists('Item Details', {'fsn_no': doc.custom_fsn_no}):
-			item_details = frappe.get_doc('Item Details', {'fsn_no': doc.custom_fsn_no})
+		item_details = get_linked_item_details(doc, {'fsn_no': doc.custom_fsn_no})
+		if item_details:
 			item_details.flipkart_item_url = f"https://www.flipkart.com/product/p/itme?pid={doc.custom_fsn_no}"
+			item_details.fsn_no = doc.custom_fsn_no
 			item_details.item = doc.name
 			item_details.save(ignore_permissions=True)
 	else:
