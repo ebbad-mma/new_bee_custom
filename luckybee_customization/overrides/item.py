@@ -8,10 +8,128 @@ from frappe.utils import today
 from .scraper_utils import scrape, set_images, extract_pid_with_regex
 from luckybee_customization.item_hooks import mark_system_field_modified
 
+STOP_WORDS = {
+	"a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
+	"in", "into", "is", "it", "of", "on", "or", "our", "that", "the", "this",
+	"to", "with", "your",
+}
+
+def resolve_best_price(stats_parsed):
+	"""B1.1 fallback chain: Buy Box current -> New current -> Buy Box 30d
+	avg -> New 30d avg -> List Price current. Buy Box current requires the
+	`offers` param on the Keepa query (token cost); if it's ever disabled,
+	those two steps just come back empty and the chain still works.
+	"""
+	current = (stats_parsed or {}).get("current") or {}
+	avg30 = (stats_parsed or {}).get("avg30") or {}
+	buybox_current = (stats_parsed or {}).get("buyBoxPrice")
+	buybox_30d = (stats_parsed or {}).get("buyBoxPrice30")
+
+	chain = [
+		(buybox_current, "Buy Box: Current"),
+		(current.get("NEW"), "New: Current"),
+		(buybox_30d, "Buy Box: 30 days avg."),
+		(avg30.get("NEW"), "New: 30 days avg."),
+		(current.get("LISTPRICE"), "List Price: Current"),
+	]
+	best_price, best_price_source = next(((v, s) for v, s in chain if v), (None, None))
+
+	price_drop_30d = None
+	new_30d, new_current = avg30.get("NEW"), current.get("NEW")
+	if new_30d and new_current:
+		price_drop_30d = round((new_30d - new_current) / new_30d * 100.0, 2)
+
+	return {
+		"amz_best_price": best_price,
+		"amz_best_price_source": best_price_source,
+		"amz_buybox_current": buybox_current,
+		"amz_buybox_30d": buybox_30d,
+		"amz_price_drop_30d": price_drop_30d,
+	}
+
+def resolve_reviews(prod, stats_parsed):
+	"""A4.3/B3.1 - reviews_rating/reviews_count were read from the raw csv
+	array, which came back empty even for items with an active rating
+	history. stats_parsed.current carries the same RATING/COUNT_REVIEWS
+	values, already scaled, so prefer that and fall back to the raw csv
+	only if stats didn't have it.
+	"""
+	current = (stats_parsed or {}).get("current") or {}
+	rating = current.get("RATING")
+	count = current.get("COUNT_REVIEWS")
+
+	if rating is None or count is None:
+		csv_data = prod.get("csv") or []
+		if count is None and len(csv_data) >= 18 and csv_data[17]:
+			count = csv_data[17][-1]
+		if rating is None and len(csv_data) >= 17 and csv_data[16]:
+			rating = csv_data[16][-1] / 10
+
+	return rating, count
+
+def apply_monthly_sold(item_detail, prod):
+	"""B1.3"""
+	item_detail.amz_monthly_sold = prod.get("monthlySold")
+	last_sold_update = prod.get("lastSoldUpdate")
+	if last_sold_update:
+		epoch_time = (last_sold_update + 21564000) * 60000
+		item_detail.amz_monthly_sold_date = datetime.datetime.utcfromtimestamp(epoch_time / 1000).strftime("%Y-%m-%d")
+
+def apply_keyword_fields(item_detail, prod):
+	"""B2.1"""
+	item_detail.amz_item_highlights = prod.get("itemHighlights")
+	item_detail.amz_recommended_uses = prod.get("recommendedUsesForProduct")
+	specific_uses = prod.get("specificUsesForProduct")
+	item_detail.amz_specific_uses = ", ".join(specific_uses) if isinstance(specific_uses, (list, tuple)) else specific_uses
+	item_detail.amz_product_benefit = prod.get("productBenefit")
+	item_detail.amz_pattern = prod.get("pattern")
+	item_detail.amz_style = prod.get("style")
+	materials = prod.get("materials")
+	item_detail.amz_material = ", ".join(materials) if isinstance(materials, (list, tuple)) else (materials or prod.get("material"))
+	product_type = prod.get("type")
+	item_detail.amz_type = ", ".join(product_type) if isinstance(product_type, (list, tuple)) else product_type
+	item_detail.amz_parent_title = prod.get("parentTitle")
+	item_detail.amz_included_components = prod.get("includedComponents")
+	item_detail.amz_url_slug = prod.get("urlSlug")
+
+def build_search_keywords(item_detail):
+	"""B2.2 - concatenate the 11 keyword fields into one de-duplicated,
+	comma-joined field for daily use on the Item.
+	"""
+	parts = [
+		item_detail.amz_item_highlights, item_detail.amz_recommended_uses,
+		item_detail.amz_specific_uses, item_detail.amz_product_benefit,
+		item_detail.amz_pattern, item_detail.amz_style, item_detail.amz_material,
+		item_detail.amz_type, item_detail.amz_parent_title,
+		item_detail.amz_included_components, item_detail.amz_url_slug,
+	]
+
+	words = []
+	seen = set()
+	for part in parts:
+		if not part:
+			continue
+		for word in re.split(r"[,\s/]+", str(part)):
+			cleaned = word.strip(".-_").lower()
+			if not cleaned or cleaned in STOP_WORDS or cleaned in seen:
+				continue
+			seen.add(cleaned)
+			words.append(cleaned)
+
+	return ", ".join(words)
+
 def sync_keepa_item(doc, event):
 	before_keepa_fields = {df.fieldname: doc.get(df.fieldname) for df in doc.meta.fields if df.fieldname}
+	savepoint = f"sync_keepa_item_{doc.name}"
+	frappe.db.savepoint(savepoint)
 	try:
 		_sync_keepa_item_internal(doc, event)
+	except Exception:
+		# B3.2 - the Item Details write and the Item-side field writes must
+		# land together or not at all, otherwise Item Details ends up fresh
+		# while the Item stays stale (or vice versa).
+		frappe.db.rollback(save_point=savepoint)
+		raise
 	finally:
 		for fieldname, before_val in before_keepa_fields.items():
 			if doc.get(fieldname) != before_val:
@@ -33,7 +151,7 @@ def _sync_keepa_item_internal(doc, event):
 			if frappe.db.exists('Item Details', {'asin_no': doc.custom_asin_no}):
 				item_detail = frappe.get_doc('Item Details', {'asin_no': doc.custom_asin_no})
 			try:
-				products = api.query(ASIN, stats=30, rating=True, update=0, domain="IN", history=1)
+				products = api.query(ASIN, stats=30, rating=True, update=0, domain="IN", history=1, offers=20)
 			except Exception as e:
 				frappe.log_error(f"Invalid ASIN: {doc.custom_asin_no}")
 				return
@@ -95,16 +213,20 @@ def _sync_keepa_item_internal(doc, event):
 								item_detail.sales_rank = str(sales_rank_history[-1])
 					item_detail.sales_rank_reference = sales_rank_reference
 					item_detail.url_amazon = f'https://www.amazon.in/dp/{doc.custom_asin_no}'
-					
-					csv_data = prod.get('csv') or []
-					if len(csv_data) > 0:
-						if len(csv_data) >= 18 and csv_data[17]:
-							doc.reviews_count = csv_data[17][-1]
-							mark_system_field_modified(doc, "reviews_count")
-						if len(csv_data) >= 17 and csv_data[16]:
-							doc.reviews_rating = str(csv_data[16][-1]/10)
-							mark_system_field_modified(doc, "reviews_rating")
-					
+
+					stats_parsed = prod.get("stats_parsed")
+
+					rating, review_count = resolve_reviews(prod, stats_parsed)
+					if review_count is not None:
+						doc.reviews_count = review_count
+						mark_system_field_modified(doc, "reviews_count")
+					if rating is not None:
+						doc.reviews_rating = str(rating)
+						mark_system_field_modified(doc, "reviews_rating")
+
+					apply_monthly_sold(item_detail, prod)
+					apply_keyword_fields(item_detail, prod)
+
 					item_detail.parent_asin = prod.get("parentAsin")
 					category_tree = []
 					category_tree_dict = {}
@@ -195,7 +317,6 @@ def _sync_keepa_item_internal(doc, event):
 							setattr(doc, f"desc_feature_{f_idx+1}", features[f_idx])
 							mark_system_field_modified(doc, f"desc_feature_{f_idx+1}")
 
-					stats_parsed = prod.get("stats_parsed")
 					if stats_parsed:
 						current = stats_parsed.get("current")
 						avg30 = stats_parsed.get("avg30")
@@ -235,6 +356,13 @@ def _sync_keepa_item_internal(doc, event):
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
 								doc.list_price_highest = highest_listprice[1]
+
+					for fieldname, value in resolve_best_price(stats_parsed).items():
+						doc.set(fieldname, value)
+						mark_system_field_modified(doc, fieldname)
+
+					doc.amz_search_keywords = build_search_keywords(item_detail)
+					mark_system_field_modified(doc, "amz_search_keywords")
 				if doc.ean:
 					item_detail.ean = doc.ean
 				item_detail.save(ignore_permissions=True)
@@ -251,7 +379,7 @@ def _sync_keepa_item_internal(doc, event):
 			if frappe.db.exists('Item Details', {'ean': doc.ean}):
 				item_detail = frappe.get_doc('Item Details', {'ean': doc.ean})
 			try:
-				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False)
+				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False, offers=20)
 			except Exception as e:
 				frappe.log_error(f"Invalid EAN: {doc.ean}")
 				return
@@ -307,16 +435,20 @@ def _sync_keepa_item_internal(doc, event):
 					doc.custom_asin_no = prod.get("asin") or doc.custom_asin_no
 					mark_system_field_modified(doc, "custom_asin_no")
 					item_detail.url_amazon = f'https://www.amazon.in/dp/{doc.custom_asin_no}'
-					
-					csv_data = prod.get('csv') or []
-					if len(csv_data) > 0:
-						if len(csv_data) >= 18 and csv_data[17]:
-							doc.reviews_count = csv_data[17][-1]
-							mark_system_field_modified(doc, "reviews_count")
-						if len(csv_data) >= 17 and csv_data[16]:
-							doc.reviews_rating = str(csv_data[16][-1]/10)
-							mark_system_field_modified(doc, "reviews_rating")
-					
+
+					stats_parsed = prod.get("stats_parsed")
+
+					rating, review_count = resolve_reviews(prod, stats_parsed)
+					if review_count is not None:
+						doc.reviews_count = review_count
+						mark_system_field_modified(doc, "reviews_count")
+					if rating is not None:
+						doc.reviews_rating = str(rating)
+						mark_system_field_modified(doc, "reviews_rating")
+
+					apply_monthly_sold(item_detail, prod)
+					apply_keyword_fields(item_detail, prod)
+
 					item_detail.parent_asin = prod.get("parentAsin")
 					category_tree = []
 					category_tree_dict = {}
@@ -397,7 +529,6 @@ def _sync_keepa_item_internal(doc, event):
 					for f_idx in range(min(5, len(features))):
 						setattr(item_detail, f"desc_feature{f_idx+1}", features[f_idx])
 
-					stats_parsed = prod.get("stats_parsed")
 					if stats_parsed:
 						current = stats_parsed.get("current")
 						avg30 = stats_parsed.get("avg30")
@@ -409,6 +540,8 @@ def _sync_keepa_item_internal(doc, event):
 							item_detail.sales_rank_current_price = current.get("SALES")
 							doc.last_price = current.get("LISTPRICE")
 							doc.custom_new_current = current.get("NEW")
+							mark_system_field_modified(doc, "last_price")
+							mark_system_field_modified(doc, "custom_new_current")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -435,6 +568,13 @@ def _sync_keepa_item_internal(doc, event):
 							highest_listprice = highest.get("LISTPRICE")
 							if highest_listprice and len(highest_listprice)==2:
 								doc.list_price_highest = highest_listprice[1]
+
+					for fieldname, value in resolve_best_price(stats_parsed).items():
+						doc.set(fieldname, value)
+						mark_system_field_modified(doc, fieldname)
+
+					doc.amz_search_keywords = build_search_keywords(item_detail)
+					mark_system_field_modified(doc, "amz_search_keywords")
 
 					if doc.custom_asin_no:
 						item_detail.asin_no = doc.custom_asin_no

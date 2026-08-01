@@ -95,7 +95,7 @@ def submit_stock_recount(item_code, warehouse, new_qty):
 
 	# Stock-take Staff is granted a narrow Custom DocPerm on Stock Reconciliation
 	# (read/write/create/submit only, no cancel/amend/delete - see
-	# create_count_webform.py) specifically so this runs as the real session user.
+	# count_webform.py) specifically so this runs as the real session user.
 	#
 	# An earlier version of this function instead ran as Administrator via
 	# frappe.set_user() (Stock-take Staff had zero Stock Reconciliation permission,

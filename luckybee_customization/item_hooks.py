@@ -43,7 +43,8 @@ def calculate_margins(doc, method=None):
     mark_system_field_modified(doc, "lb_actual_cost")
 
     try:
-        amz = float(doc.last_price) if doc.last_price else 0.0
+        amz_source = doc.amz_best_price or doc.last_price
+        amz = float(amz_source) if amz_source else 0.0
     except (ValueError, TypeError):
         amz = 0.0
 

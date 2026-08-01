@@ -61,7 +61,7 @@ def get_data(filters):
             it.last_purchase_rate,
             it.custom_mrp,
             it.valuation_rate,
-            it.last_price AS amz_price,
+            COALESCE(NULLIF(it.amz_best_price, 0), it.last_price) AS amz_price,
             it.lb_margin_pct,
             it.amz_delta_pct,
             it.reviews_rating,

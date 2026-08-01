@@ -117,7 +117,8 @@
     {% set cost = buying_p or lpr or doc.valuation_rate or 0 %}
 {% endif %}
 {% set stock_qty = frappe.db.sql("SELECT SUM(actual_qty) FROM `tabBin` WHERE item_code=%s", doc.name)[0][0] or 0 %}
-{% set amz_p = doc.last_price|float if doc.last_price else None %}
+{% set amz_p_source = doc.amz_best_price or doc.last_price %}
+{% set amz_p = amz_p_source|float if amz_p_source else None %}
 
 <div class="p360-container">
     <!-- Header -->

@@ -70,6 +70,21 @@
   "variation_attribtutes",
   "color",
   "latest_rating_time",
+  "sec_amz_intelligence",
+  "amz_monthly_sold",
+  "amz_monthly_sold_date",
+  "column_break_amz_intel",
+  "amz_item_highlights",
+  "amz_recommended_uses",
+  "amz_specific_uses",
+  "amz_product_benefit",
+  "amz_pattern",
+  "amz_style",
+  "amz_material",
+  "amz_type",
+  "amz_parent_title",
+  "amz_included_components",
+  "amz_url_slug",
   "amazon_description__features_tab",
   "section_break_amazon_desc",
   "desc_feature",
@@ -546,6 +561,80 @@
    "fieldtype": "Data",
    "label": "Flipkart Item URL",
    "options": "URL"
+  },
+  {
+   "fieldname": "sec_amz_intelligence",
+   "fieldtype": "Section Break",
+   "label": "Amazon Intelligence"
+  },
+  {
+   "fieldname": "amz_monthly_sold",
+   "fieldtype": "Int",
+   "label": "Monthly Sold"
+  },
+  {
+   "fieldname": "amz_monthly_sold_date",
+   "fieldtype": "Date",
+   "label": "Monthly Sold Date"
+  },
+  {
+   "fieldname": "column_break_amz_intel",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amz_item_highlights",
+   "fieldtype": "Small Text",
+   "label": "Item Highlights"
+  },
+  {
+   "fieldname": "amz_recommended_uses",
+   "fieldtype": "Small Text",
+   "label": "Recommended Uses"
+  },
+  {
+   "fieldname": "amz_specific_uses",
+   "fieldtype": "Small Text",
+   "label": "Specific Uses"
+  },
+  {
+   "fieldname": "amz_product_benefit",
+   "fieldtype": "Small Text",
+   "label": "Product Benefit"
+  },
+  {
+   "fieldname": "amz_pattern",
+   "fieldtype": "Data",
+   "label": "Pattern"
+  },
+  {
+   "fieldname": "amz_style",
+   "fieldtype": "Data",
+   "label": "Style"
+  },
+  {
+   "fieldname": "amz_material",
+   "fieldtype": "Data",
+   "label": "Material"
+  },
+  {
+   "fieldname": "amz_type",
+   "fieldtype": "Data",
+   "label": "Type"
+  },
+  {
+   "fieldname": "amz_parent_title",
+   "fieldtype": "Data",
+   "label": "Parent Title"
+  },
+  {
+   "fieldname": "amz_included_components",
+   "fieldtype": "Data",
+   "label": "Included Components"
+  },
+  {
+   "fieldname": "amz_url_slug",
+   "fieldtype": "Data",
+   "label": "URL Slug"
   }
  ],
  "index_web_pages_for_search": 1,
