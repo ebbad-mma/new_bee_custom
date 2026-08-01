@@ -1,6 +1,6 @@
 import frappe
 
-def create_owner_supervisor_web_form():
+def owner_supervisor_web_form():
     # 1. Setup Custom DocPerm for Owner-Supervisor on Item. Owner-Supervisor is a
     # bypass role in item_hooks.py::validate_role_field_permissions (skips the
     # per-field whitelist entirely), but that only governs which *fields* can
@@ -24,7 +24,7 @@ def create_owner_supervisor_web_form():
         dp.insert(ignore_permissions=True)
 
     # 2. Setup Custom DocPerm for Owner-Supervisor on Stock Reconciliation, matching
-    # the narrow grant given to Stock-take Staff in create_count_webform.py (read/
+    # the narrow grant given to Stock-take Staff in count_webform.py (read/
     # write/create/submit only, no cancel/amend/delete) - needed for this form's
     # optional stock-count section, which reuses api/stock_recount.py verbatim.
     filters = {"parent": "Stock Reconciliation", "role": "Owner-Supervisor"}
@@ -90,4 +90,4 @@ def create_owner_supervisor_web_form():
     print("Owner-Supervisor Web Form set up successfully!")
 
 if __name__ == "__main__":
-    create_owner_supervisor_web_form()
+    owner_supervisor_web_form()

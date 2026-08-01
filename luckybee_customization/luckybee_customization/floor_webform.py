@@ -1,6 +1,6 @@
 import frappe
 
-def create_floor_staff_web_form():
+def floor_staff_web_form():
     # 1. Setup Custom DocPerm for the custom staff roles on Item
     roles = ["Floor Staff", "Trusted Staff", "Matching Staff", "Stock-take Staff"]
     for role in roles:
@@ -73,4 +73,4 @@ frappe.ready(function() {
     print("Floor Staff Web Form and permissions set up successfully!")
 
 if __name__ == "__main__":
-    create_floor_staff_web_form()
+    floor_staff_web_form()

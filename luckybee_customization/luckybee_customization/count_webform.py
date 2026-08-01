@@ -1,6 +1,6 @@
 import frappe
 
-def create_stock_take_staff_web_form():
+def stock_take_staff_web_form():
     # 1. Setup Custom DocPerm for Stock-take Staff on Item
     filters = {"parent": "Item", "role": "Stock-take Staff"}
     if not frappe.db.exists("Custom DocPerm", filters):
@@ -78,4 +78,4 @@ def create_stock_take_staff_web_form():
     print("Stock-take Staff Web Form set up successfully!")
 
 if __name__ == "__main__":
-    create_stock_take_staff_web_form()
+    stock_take_staff_web_form()
