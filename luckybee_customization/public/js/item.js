@@ -11,6 +11,7 @@ frappe.ui.form.on('Item', {
     refresh(frm){
         move_connections_tab_to_end(frm);
         render_velocity_dashboard(frm);
+        render_amazon_image_gallery(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -255,6 +256,32 @@ function set_filter_in_subcat_on_the_basis_of_cat(frm) {
             }
         };
     });
+}
+
+function render_amazon_image_gallery(frm) {
+    const wrapper = frm.get_field('amz_image_gallery') && frm.get_field('amz_image_gallery').$wrapper;
+    if (!wrapper) return;
+
+    const rows = (frm.doc.amz_image_urls || [])
+        .filter(r => r.image_url)
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+    if (!rows.length) {
+        wrapper.html('<div class="text-muted small">No Amazon images synced.</div>');
+        return;
+    }
+
+    const thumbs = rows.map(r => `
+        <a href="${frappe.utils.escape_html(r.image_url)}" target="_blank" rel="noopener"
+           style="display:inline-block; margin:0 8px 8px 0;">
+            <img src="${frappe.utils.escape_html(r.image_url)}"
+                 title="${frappe.utils.escape_html(String(r.sequence || ''))}"
+                 style="width:90px; height:90px; object-fit:contain; border:1px solid var(--border-color); border-radius:6px; background:#fff;"
+                 onerror="this.closest('a').style.display='none'" />
+        </a>
+    `).join('');
+
+    wrapper.html(`<div style="display:flex; flex-wrap:wrap; align-items:flex-start;">${thumbs}</div>`);
 }
 
 function render_velocity_dashboard(frm) {
