@@ -33,33 +33,6 @@ def find_item_for_mobile(search_term):
     # Check which web forms have been built/exist in DB
     allowed_forms = ["all-in-one-owner-supervisor", "count-stock-take-staff", "asin-matching-staff", "product-info-trusted-staff", "photos-floor-staff"]
     existing_forms = set(frappe.get_all("Web Form", filters={"name": ["in", allowed_forms]}, pluck="name"))
-    
-    target_form_name = "photos-floor-staff"  # Default fallback
-    
-    if frappe.flags.in_test:
-        # Strict routing for tests
-        if "Owner-Supervisor" in user_roles or "System Manager" in user_roles or "Administrator" in user_roles:
-            target_form_name = "all-in-one-owner-supervisor"
-        elif "Stock-take Staff" in user_roles:
-            target_form_name = "count-stock-take-staff"
-        elif "Matching Staff" in user_roles:
-            target_form_name = "asin-matching-staff"
-        elif "Trusted Staff" in user_roles:
-            target_form_name = "product-info-trusted-staff"
-        elif "Floor Staff" in user_roles:
-            target_form_name = "photos-floor-staff"
-    else:
-        # Progressive routing fallback for manual testing
-        if ("Owner-Supervisor" in user_roles or "System Manager" in user_roles or "Administrator" in user_roles) and "all-in-one-owner-supervisor" in existing_forms:
-            target_form_name = "all-in-one-owner-supervisor"
-        elif ("Stock-take Staff" in user_roles or "Owner-Supervisor" in user_roles or "System Manager" in user_roles or "Administrator" in user_roles) and "count-stock-take-staff" in existing_forms:
-            target_form_name = "count-stock-take-staff"
-        elif ("Matching Staff" in user_roles or "Owner-Supervisor" in user_roles or "System Manager" in user_roles or "Administrator" in user_roles) and "asin-matching-staff" in existing_forms:
-            target_form_name = "asin-matching-staff"
-        elif ("Trusted Staff" in user_roles or "Owner-Supervisor" in user_roles or "System Manager" in user_roles or "Administrator" in user_roles) and "product-info-trusted-staff" in existing_forms:
-            target_form_name = "product-info-trusted-staff"
-        elif "photos-floor-staff" in existing_forms:
-            target_form_name = "photos-floor-staff"
 
     form_route_map = {
         "all-in-one-owner-supervisor": "item-owner-supervisor",
@@ -68,13 +41,41 @@ def find_item_for_mobile(search_term):
         "product-info-trusted-staff": "item-trusted-staff",
         "photos-floor-staff": "item-floor-staff"
     }
-    route = frappe.db.get_value("Web Form", target_form_name, "route") or form_route_map.get(target_form_name) or target_form_name
 
-    return {
-        "status": "found", 
-        "item_code": item_code,
-        "redirect_url": f"/{route}/{item_code}/edit"
-    }
+    def build_redirect(form_name):
+        route = frappe.db.get_value("Web Form", form_name, "route") or form_route_map.get(form_name) or form_name
+        return f"/{route}/{item_code}/edit"
+
+    is_owner_tier = "Owner-Supervisor" in user_roles or "System Manager" in user_roles or "Administrator" in user_roles
+
+    if is_owner_tier and (frappe.flags.in_test or "all-in-one-owner-supervisor" in existing_forms):
+        return {"status": "found", "item_code": item_code, "redirect_url": build_redirect("all-in-one-owner-supervisor")}
+
+    # Role -> (form, task label) a staff member could be routed to for this scan.
+    role_form_map = [
+        ("Stock-take Staff", "count-stock-take-staff", "Correct stock counts"),
+        ("Matching Staff", "asin-matching-staff", "Match to Amazon listing"),
+        ("Trusted Staff", "product-info-trusted-staff", "Brand, price, barcode, product code"),
+        ("Floor Staff", "photos-floor-staff", "Take product photos"),
+    ]
+    matches = [
+        (form_name, role, task)
+        for role, form_name, task in role_form_map
+        if role in user_roles and (frappe.flags.in_test or form_name in existing_forms)
+    ]
+
+    if len(matches) > 1:
+        return {
+            "status": "choose",
+            "item_code": item_code,
+            "options": [
+                {"role": role, "task": task, "redirect_url": build_redirect(form_name)}
+                for form_name, role, task in matches
+            ],
+        }
+
+    target_form_name = matches[0][0] if matches else "photos-floor-staff"
+    return {"status": "found", "item_code": item_code, "redirect_url": build_redirect(target_form_name)}
 
 @frappe.whitelist(allow_guest=True)
 def fetch_keepa_photo(item_code):

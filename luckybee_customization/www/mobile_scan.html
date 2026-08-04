@@ -30,6 +30,11 @@
         </div>
         <div id="search-alert" class="alert alert-danger mt-3" style="display: none;"></div>
     </div>
+
+    <div id="task-picker-card" class="card p-3 shadow-sm text-center mt-4" style="display: none;">
+        <h4>What are you doing with this item?</h4>
+        <div id="task-picker-options" class="d-grid gap-2 mt-3"></div>
+    </div>
 </div>
 
 <script src="https://unpkg.com/@zxing/browser@0.1.3/umd/zxing-browser.min.js"></script>
@@ -48,6 +53,20 @@ frappe.ready(function() {
     const searchBtn = document.getElementById('search-btn');
     const searchAlert = document.getElementById('search-alert');
     const fileInput = document.getElementById('barcode-image-upload');
+    const taskPickerCard = document.getElementById('task-picker-card');
+    const taskPickerOptions = document.getElementById('task-picker-options');
+
+    const showTaskPicker = (options) => {
+        taskPickerOptions.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('a');
+            btn.href = opt.redirect_url;
+            btn.className = 'btn btn-outline-primary text-start';
+            btn.innerHTML = `<strong>${opt.role}</strong><br><span class="small text-muted">${opt.task}</span>`;
+            taskPickerOptions.appendChild(btn);
+        });
+        taskPickerCard.style.display = 'block';
+    };
 
     // Register search events immediately to be safe
     searchBtn.addEventListener('click', () => {
@@ -111,7 +130,8 @@ frappe.ready(function() {
         searchBtn.disabled = true;
         searchBtn.innerText = "Searching...";
         searchAlert.style.display = "none";
-        
+        taskPickerCard.style.display = "none";
+
         frappe.call({
             method: 'luckybee_customization.api.mobile_forms.find_item_for_mobile',
             args: { search_term: term },
@@ -122,6 +142,9 @@ frappe.ready(function() {
                     if (controls) controls.stop();
                     // Redirect to Web Form
                     window.location.href = r.message.redirect_url;
+                } else if (r.message && r.message.status === 'choose') {
+                    if (controls) controls.stop();
+                    showTaskPicker(r.message.options);
                 } else {
                     searchAlert.innerText = "Item not found.";
                     searchAlert.style.display = "block";
