@@ -14,6 +14,16 @@ STOP_WORDS = {
 	"to", "with", "your",
 }
 
+def normalize_raw_price(raw):
+	"""Keepa's stats_parsed only scales/rescales values it recognizes as
+	part of the indexed price arrays (current, avg30, ...). buyBoxPrice and
+	buyBoxPrice30 are plain top-level ints - still in paise, and -1/-2 means
+	"no offer" - so they need the same treatment done by hand.
+	"""
+	if raw is None or raw < 0:
+		return None
+	return raw / 100.0
+
 def resolve_best_price(stats_parsed):
 	"""B1.1 fallback chain: Buy Box current -> New current -> Buy Box 30d
 	avg -> New 30d avg -> List Price current. Buy Box current requires the
@@ -22,8 +32,8 @@ def resolve_best_price(stats_parsed):
 	"""
 	current = (stats_parsed or {}).get("current") or {}
 	avg30 = (stats_parsed or {}).get("avg30") or {}
-	buybox_current = (stats_parsed or {}).get("buyBoxPrice")
-	buybox_30d = (stats_parsed or {}).get("buyBoxPrice30")
+	buybox_current = normalize_raw_price((stats_parsed or {}).get("buyBoxPrice"))
+	buybox_30d = normalize_raw_price((stats_parsed or {}).get("buyBoxPrice30"))
 
 	chain = [
 		(buybox_current, "Buy Box: Current"),
@@ -46,6 +56,48 @@ def resolve_best_price(stats_parsed):
 		"amz_buybox_30d": buybox_30d,
 		"amz_price_drop_30d": price_drop_30d,
 	}
+
+def apply_price_history(doc, avg30, avg90, avg180, lowest, highest):
+	"""avg30/avg90/avg180/lowest/highest were only ever written onto Item
+	Details, never mirrored onto the Item's own tracked fields, so the
+	Pricing & Margin tab stayed blank even on items that synced cleanly.
+	"""
+	if avg30:
+		doc.custom_sales_30days = avg30.get("SALES")
+		doc.list_price_30days = avg30.get("LISTPRICE")
+		doc.new_30days = avg30.get("NEW")
+		for f in ("custom_sales_30days", "list_price_30days", "new_30days"):
+			mark_system_field_modified(doc, f)
+	if avg90:
+		doc.custom_sales_90days = avg90.get("SALES")
+		doc.list_price_90days = avg90.get("LISTPRICE")
+		doc.new_90days = avg90.get("NEW")
+		for f in ("custom_sales_90days", "list_price_90days", "new_90days"):
+			mark_system_field_modified(doc, f)
+	if avg180:
+		doc.custom_sales_180days = avg180.get("SALES")
+		doc.list_price_180days = avg180.get("LISTPRICE")
+		doc.new_180days = avg180.get("NEW")
+		for f in ("custom_sales_180days", "list_price_180days", "new_180days"):
+			mark_system_field_modified(doc, f)
+	if lowest:
+		new_lowest = lowest.get("NEW")
+		if new_lowest and len(new_lowest) == 2:
+			doc.new_lowest = new_lowest[1]
+			mark_system_field_modified(doc, "new_lowest")
+		lowest_listprice = lowest.get("LISTPRICE")
+		if lowest_listprice and len(lowest_listprice) == 2:
+			doc.list_price_lowest = lowest_listprice[1]
+			mark_system_field_modified(doc, "list_price_lowest")
+	if highest:
+		new_highest = highest.get("NEW")
+		if new_highest and len(new_highest) == 2:
+			doc.new_highest = new_highest[1]
+			mark_system_field_modified(doc, "new_highest")
+		highest_listprice = highest.get("LISTPRICE")
+		if highest_listprice and len(highest_listprice) == 2:
+			doc.list_price_highest = highest_listprice[1]
+			mark_system_field_modified(doc, "list_price_highest")
 
 def resolve_reviews(prod, stats_parsed):
 	"""A4.3/B3.1 - reviews_rating/reviews_count were read from the raw csv
@@ -327,8 +379,10 @@ def _sync_keepa_item_internal(doc, event):
 						if current:
 							item_detail.sales_rank_current_price = current.get("SALES")
 							doc.last_price = current.get("LISTPRICE")
+							doc.new_current = current.get("NEW")
 							doc.custom_new_current = current.get("NEW")
 							mark_system_field_modified(doc, "last_price")
+							mark_system_field_modified(doc, "new_current")
 							mark_system_field_modified(doc, "custom_new_current")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
@@ -353,9 +407,8 @@ def _sync_keepa_item_internal(doc, event):
 							new_highest = highest.get("NEW")
 							if new_highest and len(new_highest)==2:
 								item_detail.new_highest = new_highest[1]
-							highest_listprice = highest.get("LISTPRICE")
-							if highest_listprice and len(highest_listprice)==2:
-								doc.list_price_highest = highest_listprice[1]
+
+						apply_price_history(doc, avg30, avg90, avg180, lowest, highest)
 
 					for fieldname, value in resolve_best_price(stats_parsed).items():
 						doc.set(fieldname, value)
@@ -539,8 +592,10 @@ def _sync_keepa_item_internal(doc, event):
 						if current:
 							item_detail.sales_rank_current_price = current.get("SALES")
 							doc.last_price = current.get("LISTPRICE")
+							doc.new_current = current.get("NEW")
 							doc.custom_new_current = current.get("NEW")
 							mark_system_field_modified(doc, "last_price")
+							mark_system_field_modified(doc, "new_current")
 							mark_system_field_modified(doc, "custom_new_current")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
@@ -565,9 +620,8 @@ def _sync_keepa_item_internal(doc, event):
 							new_highest = highest.get("NEW")
 							if new_highest and len(new_highest)==2:
 								item_detail.new_highest = new_highest[1]
-							highest_listprice = highest.get("LISTPRICE")
-							if highest_listprice and len(highest_listprice)==2:
-								doc.list_price_highest = highest_listprice[1]
+
+						apply_price_history(doc, avg30, avg90, avg180, lowest, highest)
 
 					for fieldname, value in resolve_best_price(stats_parsed).items():
 						doc.set(fieldname, value)
