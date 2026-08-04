@@ -12,6 +12,7 @@ frappe.ui.form.on('Item', {
         move_connections_tab_to_end(frm);
         render_velocity_dashboard(frm);
         render_amazon_image_gallery(frm);
+        render_supplier_history(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -179,7 +180,58 @@ function move_connections_tab_to_end(frm) {
 
 
 
-// #helper function to show latest supplier in first 
+function render_supplier_history(frm) {
+    const wrapper = frm.get_field('custom_supplier_history_html') && frm.get_field('custom_supplier_history_html').$wrapper;
+    if (!wrapper || frm.is_new()) return;
+
+    wrapper.html('<div class="text-muted small">Loading purchase history…</div>');
+
+    frappe.call({
+        method: 'luckybee_customization.api.supplier_history.get_supplier_history',
+        args: { item_code: frm.doc.name },
+        callback: function (r) {
+            const rows = r.message || [];
+            if (!rows.length) {
+                wrapper.html('<div class="text-muted small">No purchases recorded for this item yet.</div>');
+                return;
+            }
+
+            const body = rows.map(row => {
+                const date = row.posting_date ? frappe.datetime.str_to_user(row.posting_date) : '';
+                const rate = format_currency(row.rate, frm.doc.currency);
+                const qty = row.qty != null ? format_number(row.qty) : '';
+                const supplier = frappe.utils.escape_html(row.supplier_name || row.supplier || '');
+                return `
+                    <tr>
+                        <td>${supplier}</td>
+                        <td class="text-right">${rate}</td>
+                        <td class="text-right">${qty}</td>
+                        <td>${date}</td>
+                        <td><a href="/app/purchase-invoice/${encodeURIComponent(row.invoice)}">${frappe.utils.escape_html(row.invoice)}</a></td>
+                    </tr>`;
+            }).join('');
+
+            wrapper.html(`
+                <div style="overflow-x:auto;">
+                    <table class="table table-bordered" style="margin-bottom:6px;">
+                        <thead>
+                            <tr>
+                                <th>Supplier</th>
+                                <th class="text-right" style="width:130px;">Rate</th>
+                                <th class="text-right" style="width:90px;">Qty</th>
+                                <th style="width:120px;">Date</th>
+                                <th style="width:170px;">Invoice</th>
+                            </tr>
+                        </thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>
+            `);
+        }
+    });
+}
+
+// #helper function to show latest supplier in first
 function sort_supplier_history_desc(frm) {
     if (frm.doc.custom_supplier_history && frm.doc.custom_supplier_history.length > 0) {
         // Sort the child table rows by the modified date in descending order
