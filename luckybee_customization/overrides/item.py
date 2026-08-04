@@ -89,6 +89,14 @@ ITEM_DETAIL_TO_ITEM = {
 	"size": "size",
 	"color": "color",
 	"locale": "locale",
+	"amz_monthly_sold": "amz_monthly_sold",
+	"amz_monthly_sold_date": "amz_monthly_sold_date",
+	"desc_feature": "desc_feature",
+	"desc_feature1": "desc_feature_1",
+	"desc_feature2": "desc_feature_2",
+	"desc_feature3": "desc_feature_3",
+	"desc_feature4": "desc_feature_4",
+	"desc_feature5": "desc_feature_5",
 }
 
 def mirror_details_to_item(doc, item_detail):
@@ -102,6 +110,25 @@ def mirror_details_to_item(doc, item_detail):
 			continue
 		doc.set(target, value)
 		mark_system_field_modified(doc, target)
+
+def extract_image_names(prod):
+	"""Keepa returns imagesCSV on some responses and a list of {l, m} dicts
+	on others - live IN-domain queries only carry the latter, so both shapes
+	have to be handled or the item ends up with no images at all.
+	"""
+	images_csv = prod.get("imagesCSV")
+	if images_csv:
+		return [img.strip() for img in images_csv.split(',') if img.strip()]
+
+	images_list = []
+	for img_obj in prod.get("images") or []:
+		if isinstance(img_obj, dict):
+			img_file = img_obj.get("l") or img_obj.get("m")
+			if img_file:
+				images_list.append(img_file)
+		elif isinstance(img_obj, str) and img_obj.strip():
+			images_list.append(img_obj.strip())
+	return images_list
 
 def apply_amazon_image_urls(doc, images_list):
 	"""amz_image_urls is the Item's own child table. The sync already built
@@ -123,6 +150,26 @@ def mark_synced(doc):
 	doc.amz_last_synced = today()
 	mark_system_field_modified(doc, "amz_data_status")
 	mark_system_field_modified(doc, "amz_last_synced")
+
+def flag_sync_failure(doc, identifier, status, reason):
+	"""A failed Keepa call used to be logged as "Invalid ASIN" and swallowed,
+	so a network blip was indistinguishable from a genuinely bad ASIN and the
+	item saved looking fine with no Amazon data. Record what actually happened
+	and surface it, without blocking the save - staff still need to save photos
+	and counts when Keepa is unreachable.
+	"""
+	doc.amz_data_status = status
+	mark_system_field_modified(doc, "amz_data_status")
+	frappe.log_error(
+		title=f"Keepa sync failed for {identifier}: {status}",
+		message=f"{reason}\n\n{frappe.get_traceback()}",
+	)
+	if not frappe.flags.in_test and not frappe.flags.in_patch:
+		frappe.msgprint(
+			_("Amazon data could not be refreshed ({0}). The item was saved without it.").format(status),
+			indicator="orange",
+			alert=True,
+		)
 
 def apply_price_history(doc, avg30, avg90, avg180, lowest, highest):
 	"""avg30/avg90/avg180/lowest/highest were only ever written onto Item
@@ -184,6 +231,11 @@ def resolve_reviews(prod, stats_parsed):
 		if rating is None and len(csv_data) >= 17 and csv_data[16]:
 			rating = csv_data[16][-1] / 10
 
+	# Keepa's rescaling leaves float noise (3.5999999999999996), and this
+	# lands in a Data field, so it would render verbatim on the form.
+	if rating is not None:
+		rating = round(rating, 1)
+
 	return rating, count
 
 def apply_monthly_sold(item_detail, prod):
@@ -232,6 +284,9 @@ def build_search_keywords(item_detail):
 			cleaned = word.strip(".-_").lower()
 			if not cleaned or cleaned in STOP_WORDS or cleaned in seen:
 				continue
+			if cleaned.isdigit():
+				# bare counts ("1 - Piece ...") are noise, not search terms
+				continue
 			seen.add(cleaned)
 			words.append(cleaned)
 
@@ -259,7 +314,9 @@ def _sync_keepa_item_internal(doc, event):
 	if not accesskey:
 		frappe.log_error("Missing Keepa API key in site_config.json")
 		return
-	api = keepa.Keepa(accesskey)
+	# The library defaults to a 10s timeout, but an offers=20 query (needed for
+	# Buy Box pricing) routinely takes 7-9s and was timing out mid-sync.
+	api = keepa.Keepa(accesskey, timeout=60.0)
 	if doc.custom_asin_no:
 		ASIN = [doc.custom_asin_no]
 		if ASIN:
@@ -272,7 +329,10 @@ def _sync_keepa_item_internal(doc, event):
 			try:
 				products = api.query(ASIN, stats=30, rating=True, update=0, domain="IN", history=1, offers=20)
 			except Exception as e:
-				frappe.log_error(f"Invalid ASIN: {doc.custom_asin_no}")
+				flag_sync_failure(doc, doc.custom_asin_no, "Stale", f"Keepa query failed: {e}")
+				return
+			if not products or not isinstance(products[0], dict):
+				flag_sync_failure(doc, doc.custom_asin_no, "No Amazon Match", "Keepa returned no product for this ASIN.")
 				return
 			else:
 				for i in range(len(ASIN)):
@@ -288,18 +348,7 @@ def _sync_keepa_item_internal(doc, event):
 						doc.brand = brand_name
 						mark_system_field_modified(doc, "brand")
 
-					images_csv = prod.get("imagesCSV")
-					images_list = []
-					if images_csv:
-						images_list = [img.strip() for img in images_csv.split(',') if img.strip()]
-					elif prod.get("images"):
-						for img_obj in prod["images"]:
-							if isinstance(img_obj, dict):
-								img_file = img_obj.get("l") or img_obj.get("m")
-								if img_file:
-									images_list.append(img_file)
-							elif isinstance(img_obj, str) and img_obj.strip():
-								images_list.append(img_obj.strip())
+					images_list = extract_image_names(prod)
 
 					if images_list:
 						doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
@@ -504,11 +553,11 @@ def _sync_keepa_item_internal(doc, event):
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False, offers=20)
 			except Exception as e:
-				frappe.log_error(f"Invalid EAN: {doc.ean}")
+				flag_sync_failure(doc, doc.ean, "Stale", f"Keepa query failed: {e}")
 				return
-			
-			if not products or not isinstance(products, list):
-				frappe.log_error(f"No products found for {doc.ean}")
+
+			if not products or not isinstance(products, list) or not isinstance(products[0], dict):
+				flag_sync_failure(doc, doc.ean, "No Amazon Match", "Keepa returned no product for this EAN.")
 				return
 			else:
 				for i in range(len(EAN)):
@@ -525,16 +574,14 @@ def _sync_keepa_item_internal(doc, event):
 					else:
 						doc.brand = brand_name
 
-					images_csv = prod.get("imagesCSV")
-					if images_csv:
-						images_list = [img.strip() for img in images_csv.split(',') if img.strip()]
-						if images_list:
-							doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
-							for ind, image_name in enumerate(images_list):
-								field_name = f"custom_image{ind+1}"
-								image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
-								doc.set(field_name, image_url)
-						apply_amazon_image_urls(doc, images_list)
+					images_list = extract_image_names(prod)
+					if images_list:
+						doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
+						for ind, image_name in enumerate(images_list):
+							field_name = f"custom_image{ind+1}"
+							image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
+							doc.set(field_name, image_url)
+					apply_amazon_image_urls(doc, images_list)
 
 					item_detail.manufacturer = prod.get("manufacturer")
 					listed_since = prod.get("listedSince")
