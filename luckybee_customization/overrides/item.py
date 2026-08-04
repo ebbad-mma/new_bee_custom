@@ -57,6 +57,73 @@ def resolve_best_price(stats_parsed):
 		"amz_price_drop_30d": price_drop_30d,
 	}
 
+# Item Details fieldname -> Item fieldname. The two doctypes each carry
+# their own historical typo (variation_attribtutes on Item Details,
+# package_dimention on Item), so these deliberately do not line up 1:1.
+ITEM_DETAIL_TO_ITEM = {
+	"manufacturer": "manufacturer",
+	"listed_since": "listed_since",
+	"sales_rank": "sales_rank",
+	"sales_rank_reference": "sales_rank_ref",
+	"url_amazon": "amazon_url",
+	"parent_asin": "parent_asin",
+	"product_codes_upc": "upc",
+	"product_codes_partnumber": "partnumber",
+	"freq_bought_together": "freq_brought_together",
+	"variation_asins": "variation_asins",
+	"variation_attribtutes": "variation_attributes",
+	"product_group": "product_group",
+	"number_of_items": "number_of_items",
+	"package_length": "package_length",
+	"package_width": "package_width",
+	"package_height": "package_height",
+	"package_weight": "package_weight",
+	"package_quantity": "package_quantity",
+	"package_dimension": "package_dimention",
+	"model": "model",
+	"item_length": "length_length",
+	"item_breadth": "length_breadth",
+	"item_height": "length_height",
+	"item_weight": "length_weight",
+	"length_dimension": "length_dimension",
+	"size": "size",
+	"color": "color",
+	"locale": "locale",
+}
+
+def mirror_details_to_item(doc, item_detail):
+	"""The Market Intelligence tab reads the Item's own fields, but the sync
+	only ever populated their Item Details counterparts - so the tab stayed
+	blank even for items whose Item Details row synced perfectly.
+	"""
+	for source, target in ITEM_DETAIL_TO_ITEM.items():
+		value = item_detail.get(source)
+		if value in (None, ""):
+			continue
+		doc.set(target, value)
+		mark_system_field_modified(doc, target)
+
+def apply_amazon_image_urls(doc, images_list):
+	"""amz_image_urls is the Item's own child table. The sync already built
+	these URLs for doc.image / custom_image1..5 but never filled the table,
+	so the grid always rendered "No rows".
+	"""
+	if not images_list:
+		return
+	doc.set("amz_image_urls", [])
+	for idx, image_name in enumerate(images_list):
+		doc.append("amz_image_urls", {
+			"image_url": "https://images-na.ssl-images-amazon.com/images/I/" + image_name,
+			"sequence": idx + 1,
+		})
+	mark_system_field_modified(doc, "amz_image_urls")
+
+def mark_synced(doc):
+	doc.amz_data_status = "Matched"
+	doc.amz_last_synced = today()
+	mark_system_field_modified(doc, "amz_data_status")
+	mark_system_field_modified(doc, "amz_last_synced")
+
 def apply_price_history(doc, avg30, avg90, avg180, lowest, highest):
 	"""avg30/avg90/avg180/lowest/highest were only ever written onto Item
 	Details, never mirrored onto the Item's own tracked fields, so the
@@ -242,6 +309,7 @@ def _sync_keepa_item_internal(doc, event):
 							image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
 							doc.set(field_name, image_url)
 							mark_system_field_modified(doc, field_name)
+					apply_amazon_image_urls(doc, images_list)
 
 					item_detail.manufacturer = prod.get("manufacturer")
 					listed_since = prod.get("listedSince")
@@ -320,7 +388,7 @@ def _sync_keepa_item_internal(doc, event):
 					if asin_attributes:
 						attr_dict = [row for row in asin_attributes[0]]
 						if attr_dict and isinstance(attr_dict[0], dict):
-							item_detail.variation_attributes = f"{attr_dict[0].get('dimension')}: {attr_dict[0].get('value')}"
+							item_detail.variation_attribtutes = f"{attr_dict[0].get('dimension')}: {attr_dict[0].get('value')}"
 					
 					item_detail.product_group = prod.get('productGroup')
 					item_detail.number_of_items = prod.get('numberOfItems')
@@ -418,6 +486,8 @@ def _sync_keepa_item_internal(doc, event):
 					mark_system_field_modified(doc, "amz_search_keywords")
 				if doc.ean:
 					item_detail.ean = doc.ean
+				mirror_details_to_item(doc, item_detail)
+				mark_synced(doc)
 				item_detail.save(ignore_permissions=True)
 				doc.custom_item_detail = item_detail.name
 
@@ -464,7 +534,8 @@ def _sync_keepa_item_internal(doc, event):
 								field_name = f"custom_image{ind+1}"
 								image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
 								doc.set(field_name, image_url)
-					
+						apply_amazon_image_urls(doc, images_list)
+
 					item_detail.manufacturer = prod.get("manufacturer")
 					listed_since = prod.get("listedSince")
 					if listed_since:
@@ -557,7 +628,7 @@ def _sync_keepa_item_internal(doc, event):
 						item_detail.package_width = str(pkg_w / 10)
 						pkg_dimension = str((pkg_l / 10) * (pkg_w / 10) * (pkg_h / 10))
 						if (pkg_h / 10) > 0 and (pkg_l / 10) > 0 and (pkg_w / 10) > 0:
-							item_detail.package_dimention = f"{item_detail.package_length} x {item_detail.package_width} x {item_detail.package_height} cm (= {pkg_dimension}) cm\u00b3"
+							item_detail.package_dimension = f"{item_detail.package_length} x {item_detail.package_width} x {item_detail.package_height} cm (= {pkg_dimension}) cm\u00b3"
 					
 					item_detail.model = prod.get('model')
 					item_h = prod.get('itemHeight')
@@ -632,6 +703,8 @@ def _sync_keepa_item_internal(doc, event):
 
 					if doc.custom_asin_no:
 						item_detail.asin_no = doc.custom_asin_no
+					mirror_details_to_item(doc, item_detail)
+					mark_synced(doc)
 					item_detail.save(ignore_permissions=True)
 				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 	
