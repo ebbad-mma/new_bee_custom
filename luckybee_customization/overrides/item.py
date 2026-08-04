@@ -353,11 +353,6 @@ def _sync_keepa_item_internal(doc, event):
 					if images_list:
 						doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
 						mark_system_field_modified(doc, "image")
-						for ind, image_name in enumerate(images_list):
-							field_name = f"custom_image{ind+1}"
-							image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
-							doc.set(field_name, image_url)
-							mark_system_field_modified(doc, field_name)
 					apply_amazon_image_urls(doc, images_list)
 
 					item_detail.manufacturer = prod.get("manufacturer")
@@ -497,10 +492,8 @@ def _sync_keepa_item_internal(doc, event):
 							item_detail.sales_rank_current_price = current.get("SALES")
 							doc.last_price = current.get("LISTPRICE")
 							doc.new_current = current.get("NEW")
-							doc.custom_new_current = current.get("NEW")
 							mark_system_field_modified(doc, "last_price")
 							mark_system_field_modified(doc, "new_current")
-							mark_system_field_modified(doc, "custom_new_current")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -577,10 +570,6 @@ def _sync_keepa_item_internal(doc, event):
 					images_list = extract_image_names(prod)
 					if images_list:
 						doc.image = "https://images-na.ssl-images-amazon.com/images/I/" + images_list[0]
-						for ind, image_name in enumerate(images_list):
-							field_name = f"custom_image{ind+1}"
-							image_url = "https://images-na.ssl-images-amazon.com/images/I/" + image_name
-							doc.set(field_name, image_url)
 					apply_amazon_image_urls(doc, images_list)
 
 					item_detail.manufacturer = prod.get("manufacturer")
@@ -711,10 +700,8 @@ def _sync_keepa_item_internal(doc, event):
 							item_detail.sales_rank_current_price = current.get("SALES")
 							doc.last_price = current.get("LISTPRICE")
 							doc.new_current = current.get("NEW")
-							doc.custom_new_current = current.get("NEW")
 							mark_system_field_modified(doc, "last_price")
 							mark_system_field_modified(doc, "new_current")
-							mark_system_field_modified(doc, "custom_new_current")
 						if avg30:
 							item_detail.sales_30_days_avg = avg30.get("SALES")
 							item_detail.list_price_30_days_avg = avg30.get("LISTPRICE")
@@ -755,30 +742,30 @@ def _sync_keepa_item_internal(doc, event):
 					item_detail.save(ignore_permissions=True)
 				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 	
-	elif doc.custom_url or doc.custom_fsn_no:
-		if doc.custom_url:
-			if not frappe.db.exists('Item Details', {'url': doc.custom_url}):
+	elif doc.get("custom_url") or doc.get("custom_fsn_no"):
+		if doc.get("custom_url"):
+			if not frappe.db.exists('Item Details', {'url': doc.get('custom_url')}):
 				item_det = frappe.new_doc('Item Details')
-				item_det.url = doc.custom_url
-				item_det.fsn_no = doc.custom_fsn_no
+				item_det.url = doc.get('custom_url')
+				item_det.fsn_no = doc.get('custom_fsn_no')
 				item_det.save()
-			if frappe.db.exists('Item Details', {'fsn_no': doc.custom_fsn_no}):
-				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.custom_fsn_no})
-		if doc.custom_fsn_no:
-			if not frappe.db.exists('Item Details', {'fsn_no': doc.custom_fsn_no}):
+			if frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
+				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.get('custom_fsn_no')})
+		if doc.get("custom_fsn_no"):
+			if not frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
 				item_det = frappe.new_doc('Item Details')
-				item_det.url = doc.custom_url
-				item_det.fsn_no = doc.custom_fsn_no
+				item_det.url = doc.get('custom_url')
+				item_det.fsn_no = doc.get('custom_fsn_no')
 				item_det.save(ignore_permissions=True)
-			if frappe.db.exists('Item Details', {'fsn_no': doc.custom_fsn_no}):
-				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.custom_fsn_no})
+			if frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
+				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.get('custom_fsn_no')})
 
 		category_names = frappe.db.get_list("Item Category", fields=['category_name'], pluck='category_name')
 
-		if doc.custom_url:
-			fsn = extract_pid_with_regex(doc.custom_url)
+		if doc.get("custom_url"):
+			fsn = extract_pid_with_regex(doc.get('custom_url'))
 		else:
-			fsn = doc.custom_fsn_no
+			fsn = doc.get('custom_fsn_no')
 
 		doc.custom_fsn_no = fsn
 		frappe.log_error("FSN",fsn)
@@ -817,7 +804,7 @@ def _sync_keepa_item_internal(doc, event):
 		reviews=data['reviews'].split(" ")[0]
 		item_detail.flipkart_reviews_count =reviews
 		item_detail.flipkart_ratings_count = data['ratings']
-		item_detail.fsn_no = doc.custom_fsn_no
+		item_detail.fsn_no = doc.get('custom_fsn_no')
 		item_detail.flipkart_dis_per =data['discount']
 		item_detail.spec_html_data = str(data['general'])
 		item_detail.save(ignore_permissions=True)

@@ -58,7 +58,7 @@ def search_and_insert_item(doc,description,fsn, qty, rate, per, mrp, lrp,item_in
 				item.save()
 
 				time.sleep(5)
-		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'custom_reviews_rating','last_purchase_rate'])
+		item_code, reviews_rating,last_purchase_rate = frappe.db.get_value("Item", {"item_name": description}, ['item_code', 'reviews_rating','last_purchase_rate'])
 		dict_itm.update({
 							"item_code": item_code,
 							"qty": qty,

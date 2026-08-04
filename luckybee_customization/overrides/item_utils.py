@@ -38,11 +38,11 @@ def check_image(doc,method=None):
 			item_details.ean = doc.ean
 			item_details.item = doc.name
 			item_details.save(ignore_permissions=True)
-	elif doc.custom_fsn_no:
-		item_details = get_linked_item_details(doc, {'fsn_no': doc.custom_fsn_no})
+	elif doc.get("custom_fsn_no"):
+		item_details = get_linked_item_details(doc, {'fsn_no': doc.get("custom_fsn_no")})
 		if item_details:
-			item_details.flipkart_item_url = f"https://www.flipkart.com/product/p/itme?pid={doc.custom_fsn_no}"
-			item_details.fsn_no = doc.custom_fsn_no
+			item_details.flipkart_item_url = f"https://www.flipkart.com/product/p/itme?pid={doc.get('custom_fsn_no')}"
+			item_details.fsn_no = doc.get("custom_fsn_no")
 			item_details.item = doc.name
 			item_details.save(ignore_permissions=True)
 	else:
