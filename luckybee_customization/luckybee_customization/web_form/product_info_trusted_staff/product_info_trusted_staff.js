@@ -71,7 +71,23 @@ frappe.ready(function() {
             $('#ean-scan-alert').hide();
 
             if (!codeReader) {
-                codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+                // Same fix as /mobile_scan: constructed with no hints, the reader
+                // frequently never locks on. Enable the 1D symbologies explicitly
+                // (retail EAN/UPC for supplier barcodes, plus Code 128/39 for our
+                // own labels) and turn on TRY_HARDER. Hint keys are the verified
+                // literals from @zxing/browser@0.1.3 - DecodeHintType is not
+                // exported by the UMD build, POSSIBLE_FORMATS = 2, TRY_HARDER = 3.
+                const _BF = (ZXingBrowser && ZXingBrowser.BarcodeFormat) || {
+                    CODABAR: 1, CODE_39: 2, CODE_93: 3, CODE_128: 4,
+                    EAN_8: 6, EAN_13: 7, ITF: 8, UPC_A: 14, UPC_E: 15
+                };
+                const _hints = new Map();
+                _hints.set(2, [_BF.EAN_13, _BF.EAN_8, _BF.UPC_A, _BF.UPC_E,
+                               _BF.CODE_128, _BF.CODE_39, _BF.CODE_93, _BF.ITF, _BF.CODABAR]);
+                _hints.set(3, true);
+                codeReader = new ZXingBrowser.BrowserMultiFormatReader(_hints, {
+                    delayBetweenScanAttempts: 100
+                });
             }
 
             const videoElement = document.getElementById('ean-video-preview');

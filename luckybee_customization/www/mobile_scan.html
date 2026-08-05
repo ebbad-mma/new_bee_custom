@@ -16,7 +16,30 @@
                 <span class="input-group-text">Or Image:</span>
                 <input type="file" accept="image/*" id="barcode-image-upload" class="form-control">
             </div>
-            <video id="video-preview" style="width: 100%; border: 1px solid #ccc; border-radius: 8px;"></video>
+
+            <!-- Our labels print the bars sideways, so the guide is a tall box:
+                 line the bars up inside it and they end up horizontal to the
+                 sensor, which is the orientation 1D decoding actually needs. -->
+            <div style="position: relative; display: inline-block; width: 100%;">
+                <video id="video-preview" playsinline muted
+                       style="width: 100%; border: 1px solid #ccc; border-radius: 8px; background:#000;"></video>
+                <div id="scan-guide" style="position:absolute; top:12%; left:28%; width:44%; height:76%;
+                            border:2px solid rgba(0,200,0,.9); border-radius:6px; box-shadow:0 0 0 9999px rgba(0,0,0,.28);
+                            pointer-events:none;"></div>
+            </div>
+            <div class="small text-muted mt-1" id="scan-hint">
+                Fill the green box with the barcode. Hold steady about 10-15&nbsp;cm away.
+            </div>
+
+            <div class="d-flex mt-2" style="gap:8px;">
+                <button type="button" id="torch-btn" class="btn btn-outline-secondary btn-sm" style="display:none;">
+                    &#128161; Light
+                </button>
+                <div id="zoom-wrap" style="display:none; flex:1; align-items:center; gap:6px;">
+                    <span class="small text-muted">Zoom</span>
+                    <input type="range" id="zoom-range" class="form-range" style="width:100%;">
+                </div>
+            </div>
         </div>
         <button id="start-scan-btn" class="btn btn-primary w-100">Start Camera</button>
         <button id="stop-scan-btn" class="btn btn-danger w-100" style="display: none;">Stop Camera</button>
@@ -192,6 +215,117 @@ frappe.ready(function() {
         });
     };
 
+    // --- rotated decode pass -------------------------------------------------
+    //
+    // Our labels print the bars sideways (verified against real stock: L14550,
+    // L11893, L10306 all run vertically down the label). 1D decoding scans
+    // horizontal lines, so a sideways barcode is invisible to it unless the
+    // staff member happens to hold the phone turned 90 degrees. ZXing only
+    // rotates internally when the luminance source reports rotation support,
+    // and the browser canvas source returns false, so we do it ourselves:
+    // grab frames, rotate the canvas 90 degrees and decode that too.
+    //
+    // This runs alongside ZXing's own upright loop, so whichever orientation
+    // resolves first wins and the staff member does not have to think about it.
+    let rotatedTimer = null;
+    let rotatedBusy = false;
+
+    const stopRotatedDecodeLoop = () => {
+        if (rotatedTimer) {
+            clearInterval(rotatedTimer);
+            rotatedTimer = null;
+        }
+    };
+
+    const startRotatedDecodeLoop = () => {
+        stopRotatedDecodeLoop();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        rotatedTimer = setInterval(() => {
+            if (rotatedBusy || !videoElement.videoWidth) return;
+            rotatedBusy = true;
+            try {
+                const w = videoElement.videoWidth;
+                const h = videoElement.videoHeight;
+                // Rotating swaps the axes.
+                canvas.width = h;
+                canvas.height = w;
+                ctx.save();
+                ctx.translate(h / 2, w / 2);
+                ctx.rotate(Math.PI / 2);
+                ctx.drawImage(videoElement, -w / 2, -h / 2, w, h);
+                ctx.restore();
+
+                let result = null;
+                try {
+                    result = codeReader.decodeFromCanvas(canvas);
+                } catch (e) {
+                    result = null;   // no barcode in this frame - expected, keep going
+                }
+                if (result) {
+                    const text = result.getText();
+                    stopRotatedDecodeLoop();
+                    if (controls) {
+                        controls.stop();
+                        controls = null;
+                    }
+                    stopBtn.style.display = 'none';
+                    startBtn.style.display = 'block';
+                    scannerWrapper.style.display = 'none';
+                    searchInput.value = text;
+                    triggerSearch(text);
+                }
+            } catch (e) {
+                // Never let a bad frame kill the loop.
+            } finally {
+                rotatedBusy = false;
+            }
+        }, 250);
+    };
+
+    // --- torch / zoom --------------------------------------------------------
+    // Stock rooms are dim and these labels sit on brown cardboard, so the torch
+    // is often the difference between a read and a miss. Zoom lets a small
+    // barcode fill more of the sensor without physically getting closer than
+    // the lens can focus.
+    const setupCameraControls = () => {
+        setTimeout(() => {
+            const stream = videoElement.srcObject;
+            if (!stream) return;
+            const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+            if (!track || !track.getCapabilities) return;
+
+            let caps = {};
+            try { caps = track.getCapabilities() || {}; } catch (e) { return; }
+
+            const torchBtn = document.getElementById('torch-btn');
+            if (caps.torch && torchBtn) {
+                torchBtn.style.display = 'inline-block';
+                let on = false;
+                torchBtn.onclick = () => {
+                    on = !on;
+                    track.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+                    torchBtn.classList.toggle('btn-warning', on);
+                    torchBtn.classList.toggle('btn-outline-secondary', !on);
+                };
+            }
+
+            const zoomWrap = document.getElementById('zoom-wrap');
+            const zoomRange = document.getElementById('zoom-range');
+            if (caps.zoom && zoomWrap && zoomRange) {
+                zoomWrap.style.display = 'flex';
+                zoomRange.min = caps.zoom.min;
+                zoomRange.max = caps.zoom.max;
+                zoomRange.step = caps.zoom.step || 0.1;
+                zoomRange.value = track.getSettings().zoom || caps.zoom.min;
+                zoomRange.oninput = () => {
+                    track.applyConstraints({ advanced: [{ zoom: Number(zoomRange.value) }] }).catch(() => {});
+                };
+            }
+        }, 700);
+    };
+
     const startScanning = async () => {
         searchAlert.style.display = "none";
         scannerWrapper.style.display = 'block';
@@ -205,9 +339,18 @@ frappe.ready(function() {
             // 640x480, which does not carry enough pixels across the bars of a dense
             // Code 128 label for the decoder to lock on. Fall back to the plain
             // device-id call if the browser rejects the constraints.
+            //
+            // continuous focus matters more than anything else here: these labels are
+            // read close up, and a fixed-focus frame of a 2cm barcode decodes almost
+            // never. advanced[] is ignored by browsers that don't support it.
             const videoConstraints = {
                 width: { ideal: 1920 },
-                height: { ideal: 1080 }
+                height: { ideal: 1080 },
+                advanced: [
+                    { focusMode: 'continuous' },
+                    { exposureMode: 'continuous' },
+                    { whiteBalanceMode: 'continuous' }
+                ]
             };
             if (deviceIdToUse) {
                 videoConstraints.deviceId = { exact: deviceIdToUse };
@@ -229,6 +372,9 @@ frappe.ready(function() {
                     triggerSearch(text);
                 }
             };
+
+            startRotatedDecodeLoop();
+            setupCameraControls();
 
             if (typeof codeReader.decodeFromConstraints === 'function') {
                 controls = await codeReader.decodeFromConstraints(
@@ -286,6 +432,9 @@ frappe.ready(function() {
             controls.stop();
             controls = null;
         }
+        // Leaving this running would keep grabbing frames after the camera is
+        // released, and drains the battery.
+        stopRotatedDecodeLoop();
         scannerWrapper.style.display = 'none';
         stopBtn.style.display = 'none';
         startBtn.style.display = 'block';
