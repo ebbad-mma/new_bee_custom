@@ -215,73 +215,157 @@ frappe.ready(function() {
         });
     };
 
-    // --- rotated decode pass -------------------------------------------------
+    // --- detection engine ----------------------------------------------------
     //
-    // Our labels print the bars sideways (verified against real stock: L14550,
-    // L11893, L10306 all run vertically down the label). 1D decoding scans
-    // horizontal lines, so a sideways barcode is invisible to it unless the
-    // staff member happens to hold the phone turned 90 degrees. ZXing only
-    // rotates internally when the luminance source reports rotation support,
-    // and the browser canvas source returns false, so we do it ourselves:
-    // grab frames, rotate the canvas 90 degrees and decode that too.
+    // Two things were holding the scan rate down. Our labels print the bars
+    // sideways (verified on real stock: L14550, L11893, L10306 all run
+    // vertically down the label) and 1D decoding only scans horizontal lines,
+    // so a sideways code is invisible unless the phone happens to be turned.
+    // And the pure-JS decoder was being handed whole 1080p frames, which is
+    // slow enough that most frames were simply never looked at.
     //
-    // This runs alongside ZXing's own upright loop, so whichever orientation
-    // resolves first wins and the staff member does not have to think about it.
-    let rotatedTimer = null;
-    let rotatedBusy = false;
+    // So: prefer the browser's native BarcodeDetector where it exists (Android
+    // Chrome). It is hardware-accelerated, reads any orientation, and is an
+    // order of magnitude faster than the JS decoder - this is what makes it
+    // feel instant. Where it does not exist, fall back to ZXing but hand it a
+    // small cropped region instead of the full frame, and try both
+    // orientations.
+    let detectTimer = null;
+    let detecting = false;
+    let nativeDetector = null;
+    let activeStream = null;
 
-    const stopRotatedDecodeLoop = () => {
-        if (rotatedTimer) {
-            clearInterval(rotatedTimer);
-            rotatedTimer = null;
+    const stopDetectionLoop = () => {
+        if (detectTimer) {
+            clearInterval(detectTimer);
+            detectTimer = null;
         }
     };
 
-    const startRotatedDecodeLoop = () => {
-        stopRotatedDecodeLoop();
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const releaseCamera = () => {
+        stopDetectionLoop();
+        if (controls) {
+            try { controls.stop(); } catch (e) {}
+            controls = null;
+        }
+        if (activeStream) {
+            activeStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+            activeStream = null;
+        }
+        videoElement.srcObject = null;
+    };
 
-        rotatedTimer = setInterval(() => {
-            if (rotatedBusy || !videoElement.videoWidth) return;
-            rotatedBusy = true;
+    const onHit = (text) => {
+        if (!text) return;
+        releaseCamera();
+        // Immediate physical feedback - staff are looking at the box, not the screen.
+        try { if (navigator.vibrate) navigator.vibrate(80); } catch (e) {}
+        stopBtn.style.display = 'none';
+        startBtn.style.display = 'block';
+        scannerWrapper.style.display = 'none';
+        searchInput.value = text;
+        triggerSearch(text);
+    };
+
+    const initNativeDetector = async () => {
+        if (!('BarcodeDetector' in window)) return null;
+        try {
+            const supported = await window.BarcodeDetector.getSupportedFormats();
+            const wanted = ['code_128', 'code_39', 'code_93', 'codabar', 'itf',
+                            'ean_13', 'ean_8', 'upc_a', 'upc_e'].filter(f => supported.includes(f));
+            if (!wanted.length) return null;
+            return new window.BarcodeDetector({ formats: wanted });
+        } catch (e) {
+            return null;
+        }
+    };
+
+    // Crop to the guide box and scale up. A barcode needs a couple of pixels per
+    // narrow bar to decode; cropping removes the shelf, the box art and the rest
+    // of the frame, which is both faster and far less likely to mislead the
+    // binarizer.
+    const cropCanvas = document.createElement('canvas');
+    const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
+    const rotCanvas = document.createElement('canvas');
+    const rotCtx = rotCanvas.getContext('2d', { willReadFrequently: true });
+
+    const zxingTryDecode = (canvas) => {
+        try {
+            const r = codeReader.decodeFromCanvas(canvas);
+            return r ? r.getText() : null;
+        } catch (e) {
+            return null;   // no code in this frame - expected
+        }
+    };
+
+    const zxingScanFrame = () => {
+        const vw = videoElement.videoWidth;
+        const vh = videoElement.videoHeight;
+        if (!vw) return null;
+
+        // Matches the on-screen guide box (28% / 12% offsets, 44% x 76%), with a
+        // little margin so a slightly misplaced label is still covered.
+        const sx = Math.floor(vw * 0.22);
+        const sy = Math.floor(vh * 0.06);
+        const sw = Math.floor(vw * 0.56);
+        const sh = Math.floor(vh * 0.88);
+
+        const scale = Math.min(2, Math.max(1, 900 / Math.max(sw, sh)));
+        cropCanvas.width = Math.floor(sw * scale);
+        cropCanvas.height = Math.floor(sh * scale);
+        cropCtx.drawImage(videoElement, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+
+        const upright = zxingTryDecode(cropCanvas);
+        if (upright) return upright;
+
+        // Same crop turned 90 degrees, for our sideways-printed labels.
+        rotCanvas.width = cropCanvas.height;
+        rotCanvas.height = cropCanvas.width;
+        rotCtx.save();
+        rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+        rotCtx.rotate(Math.PI / 2);
+        rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
+        rotCtx.restore();
+        return zxingTryDecode(rotCanvas);
+    };
+
+    const startDetectionLoop = async () => {
+        stopDetectionLoop();
+        if (nativeDetector === null) {
+            nativeDetector = await initNativeDetector();
+        }
+
+        const hint = document.getElementById('scan-hint');
+        if (hint && nativeDetector) {
+            hint.textContent = 'Fill the green box with the barcode. Any direction is fine.';
+        }
+
+        // The native path is cheap enough to run often; the JS fallback is not.
+        const interval = nativeDetector ? 100 : 200;
+
+        detectTimer = setInterval(async () => {
+            if (detecting || !videoElement.videoWidth) return;
+            detecting = true;
             try {
-                const w = videoElement.videoWidth;
-                const h = videoElement.videoHeight;
-                // Rotating swaps the axes.
-                canvas.width = h;
-                canvas.height = w;
-                ctx.save();
-                ctx.translate(h / 2, w / 2);
-                ctx.rotate(Math.PI / 2);
-                ctx.drawImage(videoElement, -w / 2, -h / 2, w, h);
-                ctx.restore();
-
-                let result = null;
-                try {
-                    result = codeReader.decodeFromCanvas(canvas);
-                } catch (e) {
-                    result = null;   // no barcode in this frame - expected, keep going
-                }
-                if (result) {
-                    const text = result.getText();
-                    stopRotatedDecodeLoop();
-                    if (controls) {
-                        controls.stop();
-                        controls = null;
+                if (nativeDetector) {
+                    const codes = await nativeDetector.detect(videoElement);
+                    if (codes && codes.length && codes[0].rawValue) {
+                        onHit(codes[0].rawValue.trim());
+                        return;
                     }
-                    stopBtn.style.display = 'none';
-                    startBtn.style.display = 'block';
-                    scannerWrapper.style.display = 'none';
-                    searchInput.value = text;
-                    triggerSearch(text);
+                } else {
+                    const text = zxingScanFrame();
+                    if (text) {
+                        onHit(text.trim());
+                        return;
+                    }
                 }
             } catch (e) {
-                // Never let a bad frame kill the loop.
+                // A bad frame must never kill the loop.
             } finally {
-                rotatedBusy = false;
+                detecting = false;
             }
-        }, 250);
+        }, interval);
     };
 
     // --- torch / zoom --------------------------------------------------------
@@ -331,18 +415,13 @@ frappe.ready(function() {
         scannerWrapper.style.display = 'block';
         startBtn.style.display = 'none';
         stopBtn.style.display = 'block';
-        
+
         try {
             const deviceIdToUse = selectedDeviceId || undefined;
 
-            // Request a high-resolution rear-facing stream. The browser default is often
-            // 640x480, which does not carry enough pixels across the bars of a dense
-            // Code 128 label for the decoder to lock on. Fall back to the plain
-            // device-id call if the browser rejects the constraints.
-            //
-            // continuous focus matters more than anything else here: these labels are
-            // read close up, and a fixed-focus frame of a 2cm barcode decodes almost
-            // never. advanced[] is ignored by browsers that don't support it.
+            // Own the stream directly rather than letting ZXing open it. That is the
+            // only way to pin continuous focus and a high resolution, and both matter
+            // far more than the decoder choice for a small label read close up.
             const videoConstraints = {
                 width: { ideal: 1920 },
                 height: { ideal: 1080 },
@@ -358,34 +437,26 @@ frappe.ready(function() {
                 videoConstraints.facingMode = { ideal: 'environment' };
             }
 
-            const onDecode = (result, err) => {
-                if (result) {
-                    if (controls) {
-                        controls.stop();
-                        controls = null;
-                    }
-                    stopBtn.style.display = 'none';
-                    startBtn.style.display = 'block';
-                    scannerWrapper.style.display = 'none';
-                    const text = result.getText();
-                    searchInput.value = text;
-                    triggerSearch(text);
-                }
-            };
-
-            startRotatedDecodeLoop();
-            setupCameraControls();
-
-            if (typeof codeReader.decodeFromConstraints === 'function') {
-                controls = await codeReader.decodeFromConstraints(
-                    { video: videoConstraints }, videoElement, onDecode
-                );
-            } else {
-                controls = await codeReader.decodeFromVideoDevice(
-                    deviceIdToUse, videoElement, onDecode
-                );
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+            } catch (e) {
+                // Some devices reject the advanced block outright - retry plainly
+                // rather than leaving the user with no camera at all.
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: deviceIdToUse ? { deviceId: { exact: deviceIdToUse } }
+                                         : { facingMode: { ideal: 'environment' } },
+                    audio: false
+                });
             }
 
+            activeStream = stream;
+            videoElement.srcObject = stream;
+            videoElement.setAttribute('playsinline', 'true');
+            await videoElement.play().catch(() => {});
+
+            setupCameraControls();
+            startDetectionLoop();
 
             // Populate camera select dropdown once permission is granted
             if (cameraSelect.options.length === 0) {
@@ -428,37 +499,74 @@ frappe.ready(function() {
 
 
     stopBtn.addEventListener('click', () => {
-        if (controls) {
-            controls.stop();
-            controls = null;
-        }
-        // Leaving this running would keep grabbing frames after the camera is
-        // released, and drains the battery.
-        stopRotatedDecodeLoop();
+        // Also stops the detection loop and hands the camera back, which
+        // otherwise keeps the sensor live and drains the battery.
+        releaseCamera();
         scannerWrapper.style.display = 'none';
         stopBtn.style.display = 'none';
         startBtn.style.display = 'block';
     });
 
-    // File input fallback for headless testing
+    // Photo fallback. Also the easiest way to sanity-check a troublesome label
+    // without fighting the live camera: take a picture of it and feed it in.
+    // Same engine as the live path - native detector first, then ZXing in both
+    // orientations - so a sideways label decodes here too.
     fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            try {
-                const imgUrl = URL.createObjectURL(file);
-                const result = await codeReader.decodeFromImageUrl(imgUrl);
-                if (result) {
-                    searchInput.value = result.getText();
-                    triggerSearch(result.getText());
-                } else {
-                    searchAlert.innerText = "Could not decode barcode.";
-                    searchAlert.style.display = "block";
-                }
-            } catch (err) {
-                searchAlert.innerText = "Could not decode barcode.";
-                searchAlert.style.display = "block";
-                console.error(err);
+        if (!file) return;
+
+        searchAlert.style.display = "none";
+        const imgUrl = URL.createObjectURL(file);
+
+        try {
+            const img = new Image();
+            img.src = imgUrl;
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
+            if (nativeDetector === null) {
+                nativeDetector = await initNativeDetector();
             }
+
+            if (nativeDetector) {
+                const codes = await nativeDetector.detect(img);
+                if (codes && codes.length && codes[0].rawValue) {
+                    const text = codes[0].rawValue.trim();
+                    searchInput.value = text;
+                    triggerSearch(text);
+                    return;
+                }
+            }
+
+            // ZXing, upright then rotated.
+            cropCanvas.width = img.naturalWidth;
+            cropCanvas.height = img.naturalHeight;
+            cropCtx.drawImage(img, 0, 0);
+
+            let text = zxingTryDecode(cropCanvas);
+            if (!text) {
+                rotCanvas.width = cropCanvas.height;
+                rotCanvas.height = cropCanvas.width;
+                rotCtx.save();
+                rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+                rotCtx.rotate(Math.PI / 2);
+                rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
+                rotCtx.restore();
+                text = zxingTryDecode(rotCanvas);
+            }
+
+            if (text) {
+                searchInput.value = text.trim();
+                triggerSearch(text.trim());
+            } else {
+                searchAlert.innerText = "Could not read a barcode in that photo. Try again closer, with the bars filling more of the frame.";
+                searchAlert.style.display = "block";
+            }
+        } catch (err) {
+            searchAlert.innerText = "Could not read that image.";
+            searchAlert.style.display = "block";
+            console.error(err);
+        } finally {
+            URL.revokeObjectURL(imgUrl);
         }
     });
 });
