@@ -15,11 +15,17 @@ import frappe
 #       asin_purchase_invoice.py reads both via frappe.db.get_value, which
 #       raises OperationalError 1054 once the column is gone. Removing that
 #       block changes purchase-flow behaviour, so it needs its own change.
+#   custom_url, custom_fsn_no, custom_box_number
+#       REMOVED from this list. These three are on the project's never-touch
+#       list - they are tied to the still-active Flipkart receiving flow, and
+#       the standing instruction is not to delete, rename, repoint or hide
+#       them. Deleting them here also dropped their columns, which destroys
+#       the data outright; the fields then silently reappear because
+#       woocommerceconnector ships them in its own fixtures and sync_fixtures
+#       runs after patches, so the form looks correct afterwards while the
+#       values are gone. Left in place deliberately - do not re-add.
 DEAD_FIELDS = [
     "custom_product_url",
-    "custom_url",                # Flipkart URL - branch now guarded with doc.get()
-    "custom_fsn_no",             # ditto
-    "custom_box_number",
     "custom_category_sub",
     "custom_ean",                # dead twin of ean
     "custom_reviews_rating",     # dead twin of reviews_rating
