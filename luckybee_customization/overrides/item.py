@@ -357,6 +357,38 @@ def apply_monthly_sold(item_detail, prod):
 		epoch_time = (last_sold_update + 21564000) * 60000
 		item_detail.amz_monthly_sold_date = datetime.datetime.utcfromtimestamp(epoch_time / 1000).strftime("%Y-%m-%d")
 
+def set_within_limit(doc, fieldname, value):
+	"""Assign a Keepa string without letting its length block the whole save.
+
+	Amazon strings are arbitrarily long. A `Data` field is capped at 140
+	characters, and Frappe rejects the entire document with "Value too big"
+	rather than trimming - so one long parentTitle made an Item unsaveable,
+	which also blocks shop-floor staff from saving photos or counts on it.
+	Reported live on erp.luckybee.in for B08MXJYB2V.
+
+	The seven fields this touches have been widened to Small Text (no cap), so
+	normally nothing is trimmed. This stays as a backstop for any capped field
+	that slips through - reference/keyword data losing its tail is always
+	preferable to an item nobody can save. Trimming is logged so it is visible
+	rather than silent.
+	"""
+	if value is None:
+		doc.set(fieldname, None)
+		return
+
+	value = str(value)
+	df = doc.meta.get_field(fieldname)
+	# Only Data-like fields carry a length cap; Small/Long Text do not.
+	limit = (df.length or 140) if df and df.fieldtype == "Data" else None
+
+	if limit and len(value) > limit:
+		frappe.logger("keepa").info(
+			f"Trimmed {doc.doctype}.{fieldname} from {len(value)} to {limit} chars"
+		)
+		value = value[:limit]
+
+	doc.set(fieldname, value)
+
 def apply_keyword_fields(item_detail, prod):
 	"""B2.1"""
 	item_detail.amz_item_highlights = prod.get("itemHighlights")
@@ -364,15 +396,17 @@ def apply_keyword_fields(item_detail, prod):
 	specific_uses = prod.get("specificUsesForProduct")
 	item_detail.amz_specific_uses = ", ".join(specific_uses) if isinstance(specific_uses, (list, tuple)) else specific_uses
 	item_detail.amz_product_benefit = prod.get("productBenefit")
-	item_detail.amz_pattern = prod.get("pattern")
-	item_detail.amz_style = prod.get("style")
+	set_within_limit(item_detail, "amz_pattern", prod.get("pattern"))
+	set_within_limit(item_detail, "amz_style", prod.get("style"))
 	materials = prod.get("materials")
-	item_detail.amz_material = ", ".join(materials) if isinstance(materials, (list, tuple)) else (materials or prod.get("material"))
+	set_within_limit(item_detail, "amz_material",
+					 ", ".join(materials) if isinstance(materials, (list, tuple)) else (materials or prod.get("material")))
 	product_type = prod.get("type")
-	item_detail.amz_type = ", ".join(product_type) if isinstance(product_type, (list, tuple)) else product_type
-	item_detail.amz_parent_title = prod.get("parentTitle")
-	item_detail.amz_included_components = prod.get("includedComponents")
-	item_detail.amz_url_slug = prod.get("urlSlug")
+	set_within_limit(item_detail, "amz_type",
+					 ", ".join(product_type) if isinstance(product_type, (list, tuple)) else product_type)
+	set_within_limit(item_detail, "amz_parent_title", prod.get("parentTitle"))
+	set_within_limit(item_detail, "amz_included_components", prod.get("includedComponents"))
+	set_within_limit(item_detail, "amz_url_slug", prod.get("urlSlug"))
 
 def build_search_keywords(item_detail):
 	"""B2.2 - concatenate the 11 keyword fields into one de-duplicated,

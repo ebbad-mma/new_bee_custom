@@ -603,37 +603,37 @@
   },
   {
    "fieldname": "amz_pattern",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Pattern"
   },
   {
    "fieldname": "amz_style",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Style"
   },
   {
    "fieldname": "amz_material",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Material"
   },
   {
    "fieldname": "amz_type",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Type"
   },
   {
    "fieldname": "amz_parent_title",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Parent Title"
   },
   {
    "fieldname": "amz_included_components",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Included Components"
   },
   {
    "fieldname": "amz_url_slug",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "URL Slug"
   }
  ],
