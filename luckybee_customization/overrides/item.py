@@ -184,9 +184,51 @@ def apply_amazon_image_urls(doc, images_list):
 		})
 	mark_system_field_modified(doc, "amz_image_urls")
 
-def mark_synced(doc):
-	doc.amz_data_status = "Matched"
+def resolve_oos_percent(prod):
+	"""B4 - Keepa's 30-day out-of-stock percentage for the NEW offer.
+
+	It lives in the raw `stats` block as a plain percentage (4 means 4%). The
+	library's stats_parsed divides price-like values by 100, so the same figure
+	shows up there as 0.04 - read the raw block to avoid a 100x error. Values
+	are per csv index; index 1 is NEW. -1 means "not reported".
+	"""
+	stats = (prod or {}).get("stats") or {}
+	oos = stats.get("outOfStockPercentage30") or stats.get("outOfStockPercentage90")
+	if not isinstance(oos, (list, tuple)) or len(oos) < 2:
+		return None
+	value = oos[1]  # NEW
+	if not isinstance(value, (int, float)) or value < 0:
+		return None
+	return float(value)
+
+def mark_synced(doc, prod=None):
+	"""B3/B4 - stamp freshness and derive the stock-state flag.
+
+	amz_last_synced records that we tried; amz_last_successful_sync records
+	when we last actually came back with a usable price. The gap between them
+	is what makes silently-failing syncs visible.
+	"""
+	oos_percent = resolve_oos_percent(prod)
+	if oos_percent is not None:
+		doc.amz_oos_percent = oos_percent
+		mark_system_field_modified(doc, "amz_oos_percent")
+
+	got_price = bool(doc.get("amz_best_price"))
+
+	# Near-permanent out of stock is the cleaner discontinued signal; fall back
+	# to "we got nothing at all this time" for the plain no-offer case.
+	if oos_percent is not None and oos_percent >= 99:
+		doc.amz_data_status = "Out of Stock / Discontinued"
+	elif not got_price:
+		doc.amz_data_status = "Refresh Failed"
+	else:
+		doc.amz_data_status = "Matched"
+
 	doc.amz_last_synced = today()
+	if got_price:
+		doc.amz_last_successful_sync = today()
+		mark_system_field_modified(doc, "amz_last_successful_sync")
+
 	mark_system_field_modified(doc, "amz_data_status")
 	mark_system_field_modified(doc, "amz_last_synced")
 
@@ -596,7 +638,7 @@ def _sync_keepa_item_internal(doc, event):
 				if doc.ean:
 					item_detail.ean = doc.ean
 				mirror_details_to_item(doc, item_detail)
-				mark_synced(doc)
+				mark_synced(doc, prod)
 				item_detail.save(ignore_permissions=True)
 				doc.custom_item_detail = item_detail.name
 
@@ -803,7 +845,7 @@ def _sync_keepa_item_internal(doc, event):
 					if doc.custom_asin_no:
 						item_detail.asin_no = doc.custom_asin_no
 					mirror_details_to_item(doc, item_detail)
-					mark_synced(doc)
+					mark_synced(doc, prod)
 					item_detail.save(ignore_permissions=True)
 				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 	

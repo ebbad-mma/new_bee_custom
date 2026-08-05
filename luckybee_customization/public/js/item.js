@@ -13,6 +13,8 @@ frappe.ui.form.on('Item', {
         render_velocity_dashboard(frm);
         render_amazon_image_gallery(frm);
         render_supplier_history(frm);
+        render_amazon_freshness(frm);
+        add_refresh_amazon_button(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -386,3 +388,88 @@ function render_velocity_dashboard(frm) {
 
 
 
+
+// B3 - the sync date existed but was buried on the Market Intelligence tab.
+// Surface it next to the Amazon price where the pricing decision is actually
+// made, and colour it by age: under 30 days neutral, 30-90 amber, over 90 red.
+function render_amazon_freshness(frm) {
+    const $wrap = frm.fields_dict.amz_best_price && frm.fields_dict.amz_best_price.$wrapper;
+    if (!$wrap) return;
+
+    $wrap.find('.lb-amz-freshness').remove();
+    if (frm.is_new()) return;
+
+    const tried = frm.doc.amz_last_synced;
+    const succeeded = frm.doc.amz_last_successful_sync;
+    if (!tried && !succeeded) return;
+
+    const days = d => d ? frappe.datetime.get_day_diff(frappe.datetime.now_date(), d) : null;
+    const successAge = days(succeeded);
+    const triedAge = days(tried);
+
+    // Age the badge on when we last got real data, not merely when we last tried.
+    const age = successAge === null ? triedAge : successAge;
+
+    let colour = '#6c757d';               // under 30 days - neutral
+    if (age !== null && age > 90) colour = '#c0392b';        // over 90 - red
+    else if (age !== null && age >= 30) colour = '#b9770e';  // 30-90 - amber
+
+    const human = a => a === null ? 'never'
+        : a === 0 ? 'today'
+        : a === 1 ? 'yesterday'
+        : `${a} days ago`;
+
+    let text = succeeded ? `synced ${human(successAge)}` : 'no successful sync yet';
+
+    // The gap between "tried" and "last got real data" is what exposes a sync
+    // that has been quietly failing.
+    if (succeeded && triedAge !== null && successAge !== null && successAge - triedAge > 0) {
+        text += ` (last attempt ${human(triedAge)})`;
+    } else if (!succeeded && tried) {
+        text += ` (last attempt ${human(triedAge)})`;
+    }
+
+    const status = frm.doc.amz_data_status;
+    const statusBit = status && status !== 'Matched'
+        ? ` &middot; <strong>${frappe.utils.escape_html(status)}</strong>` : '';
+
+    $wrap.append(`
+        <div class="lb-amz-freshness" style="margin-top:4px; font-size:11.5px; color:${colour};">
+            ${frappe.utils.escape_html(text)}${statusBit}
+        </div>
+    `);
+}
+
+// B7 - re-pull Keepa for this ASIN on demand, rather than waiting for the
+// nightly job, and stamp the sync date.
+function add_refresh_amazon_button(frm) {
+    if (frm.is_new() || !frm.doc.custom_asin_no) return;
+
+    frm.add_custom_button(__('Refresh Amazon Data'), function () {
+        frappe.dom.freeze(__('Refreshing from Amazon...'));
+        frappe.call({
+            method: 'luckybee_customization.api.keepa_refresh.refresh_amazon_data',
+            args: { item_code: frm.doc.name },
+            callback: function (r) {
+                frappe.dom.unfreeze();
+                const res = r.message || {};
+                if (res.status === 'ok') {
+                    frappe.show_alert({
+                        message: __('Amazon data refreshed ({0})', [res.amz_data_status || '-']),
+                        indicator: 'green'
+                    });
+                    frm.reload_doc();
+                } else {
+                    frappe.msgprint({
+                        title: __('Could not refresh'),
+                        message: res.message || __('Amazon data could not be refreshed.'),
+                        indicator: 'orange'
+                    });
+                }
+            },
+            error: function () {
+                frappe.dom.unfreeze();
+            }
+        });
+    });
+}
