@@ -149,7 +149,10 @@ scheduler_events = {
         ]
     },
     "daily": [
-        "luckybee_customization.jobs.refresh_velocity"
+        "luckybee_customization.jobs.refresh_velocity",
+        # B4 - "Stale" is an age-based state that becomes true with the passage
+        # of time, so it needs a sweep rather than being decided at sync time.
+        "luckybee_customization.jobs_keepa.flag_stale_amazon_data"
     ],
     "hourly": [
         "luckybee_customization.overrides.item_utils.update_item_in_woocom",

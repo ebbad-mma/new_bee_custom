@@ -137,6 +137,43 @@ def bulk_keepa_sync_scheduled():
 	bulk_keepa_sync()
 
 
+# B4 - "Stale: last sync succeeded but over 90 days old".
+STALE_AFTER_DAYS = 90
+
+
+@frappe.whitelist()
+def flag_stale_amazon_data():
+	"""Move items whose last *successful* sync has aged past the threshold to
+	"Stale".
+
+	This cannot be decided at sync time: an item is Matched the moment it syncs
+	and only becomes Stale later through the passage of time, with nothing
+	running against it. So it needs its own sweep.
+
+	Deliberately only touches rows currently marked "Matched" - "Refresh
+	Failed" and "Out of Stock / Discontinued" say something more specific about
+	why the data is untrustworthy, and overwriting them with the blander
+	"Stale" would lose that. Done as a single UPDATE rather than per-document
+	saves: this is a status recalculation over thousands of rows and must not
+	re-trigger the Keepa sync on before_save.
+	"""
+	updated = frappe.db.sql(
+		"""
+		UPDATE `tabItem`
+		SET amz_data_status = 'Stale'
+		WHERE amz_data_status = 'Matched'
+		  AND amz_last_successful_sync IS NOT NULL
+		  AND amz_last_successful_sync < DATE_SUB(CURDATE(), INTERVAL %s DAY)
+		""",
+		(STALE_AFTER_DAYS,),
+	)
+	frappe.db.commit()
+	return {
+		"marked_stale": frappe.db.count("Item", {"amz_data_status": "Stale"}),
+		"threshold_days": STALE_AFTER_DAYS,
+	}
+
+
 @frappe.whitelist()
 def bulk_keepa_sync_status():
 	"""How much of the catalogue still needs a successful Amazon sync."""

@@ -176,6 +176,28 @@
         <div class="p360-panel">
             <div class="p360-panel-title">📦 Amazon Benchmark</div>
             <div class="p360-row"><span class="p360-label">AMZ Price (Current)</span><span class="p360-val">{% if amz_p and amz_p > 0 %}₹{{ "%.2f"|format(amz_p) }}{% else %}N/A{% endif %}</span></div>
+            {# B3 - the price is only as good as its age, so the freshness sits
+               directly beneath it here as well as on the Item form. Coloured on
+               the same thresholds: under 30 days neutral, 30-90 amber, over 90 red. #}
+            <div class="p360-row">
+                <span class="p360-label">Data Freshness</span>
+                <span class="p360-val">
+                    {% if doc.amz_last_successful_sync %}
+                        {% set age = (frappe.utils.getdate() - frappe.utils.getdate(doc.amz_last_successful_sync)).days %}
+                        {% set colour = "#c0392b" if age > 90 else ("#b9770e" if age >= 30 else "#555") %}
+                        <span style="color: {{ colour }};">
+                            synced {% if age == 0 %}today{% elif age == 1 %}yesterday{% else %}{{ age }} days ago{% endif %}
+                        </span>
+                    {% elif doc.amz_last_synced %}
+                        <span style="color: #c0392b;">no successful sync yet</span>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                    {% if doc.amz_data_status and doc.amz_data_status != "Matched" %}
+                        &middot; {{ doc.amz_data_status }}
+                    {% endif %}
+                </span>
+            </div>
             <div class="p360-row"><span class="p360-label">vs AMZ Delta %</span><span class="p360-val">{% if doc.amz_delta_pct is not none and amz_p and amz_p > 0 %}{{ doc.amz_delta_pct }}%{% else %}N/A{% endif %}</span></div>
             <div class="p360-row"><span class="p360-label">Review Rating</span><span class="p360-val">{% if doc.reviews_rating %}⭐ {{ doc.reviews_rating }}{% else %}N/A{% endif %}</span></div>
             <div class="p360-row"><span class="p360-label">Review Count</span><span class="p360-val">{% if doc.reviews_count %}{{ doc.reviews_count }}{% else %}N/A{% endif %}</span></div>

@@ -474,7 +474,7 @@ def _sync_keepa_item_internal(doc, event):
 			try:
 				products = api.query(ASIN, stats=30, rating=True, update=0, domain="IN", history=1, offers=20)
 			except Exception as e:
-				flag_sync_failure(doc, doc.custom_asin_no, "Stale", f"Keepa query failed: {e}")
+				flag_sync_failure(doc, doc.custom_asin_no, "Refresh Failed", f"Keepa query failed: {e}")
 				return
 			if not products or not isinstance(products[0], dict):
 				flag_sync_failure(doc, doc.custom_asin_no, "No Amazon Match", "Keepa returned no product for this ASIN.")
@@ -689,7 +689,7 @@ def _sync_keepa_item_internal(doc, event):
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False, offers=20)
 			except Exception as e:
-				flag_sync_failure(doc, doc.ean, "Stale", f"Keepa query failed: {e}")
+				flag_sync_failure(doc, doc.ean, "Refresh Failed", f"Keepa query failed: {e}")
 				return
 
 			if not products or not isinstance(products, list) or not isinstance(products[0], dict):
