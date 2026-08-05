@@ -32,7 +32,7 @@ def execute():
           fieldtype="Column Break")
     field("Item", "amz_best_price_source", "column_break_amz_benchmark_current",
           fieldtype="Select", label="AMZ Best Price Source",
-          options="\nBuy Box: Current\nNew: Current\nBuy Box: 30 days avg.\nNew: 30 days avg.\nList Price: Current")
+          options="\nBuy Box: Current\nNew: Current\nBuy Box: 30 days avg.\nNew: 30 days avg.\nNew: 90 days avg.\nNew: 180 days avg.\nList Price: Current")
 
     # Tab 2 Pricing & Margin - Amazon Benchmark, history (collapsed)
     field("Item", "sec_amz_benchmark_history", "amz_best_price_source",

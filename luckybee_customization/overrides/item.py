@@ -26,12 +26,26 @@ def normalize_raw_price(raw):
 
 def resolve_best_price(stats_parsed):
 	"""B1.1 fallback chain: Buy Box current -> New current -> Buy Box 30d
-	avg -> New 30d avg -> List Price current. Buy Box current requires the
-	`offers` param on the Keepa query (token cost); if it's ever disabled,
-	those two steps just come back empty and the chain still works.
+	avg -> New 30d avg -> New 90d avg -> New 180d avg -> List Price current.
+	Buy Box current requires the `offers` param on the Keepa query (token
+	cost); if it's ever disabled, those two steps just come back empty and
+	the chain still works.
+
+	On -1 ("no offer available", i.e. out of stock / discontinued): the keepa
+	library's own parser already drops any negative value before we see it
+	(_normalize_value returns None for v < 0, and the key is then omitted from
+	stats_parsed entirely), so -1 can never reach these fields. The
+	normalize_raw_price() guard above covers buyBoxPrice/buyBoxPrice30, which
+	are plain top-level ints the library does not touch. Verified end-to-end
+	against the installed keepa parser with an all -1 payload.
+
+	The 90d/180d steps matter because a product can be out of stock now while
+	still having a real, useful average from earlier in the window.
 	"""
 	current = (stats_parsed or {}).get("current") or {}
 	avg30 = (stats_parsed or {}).get("avg30") or {}
+	avg90 = (stats_parsed or {}).get("avg90") or {}
+	avg180 = (stats_parsed or {}).get("avg180") or {}
 	buybox_current = normalize_raw_price((stats_parsed or {}).get("buyBoxPrice"))
 	buybox_30d = normalize_raw_price((stats_parsed or {}).get("buyBoxPrice30"))
 
@@ -40,8 +54,11 @@ def resolve_best_price(stats_parsed):
 		(current.get("NEW"), "New: Current"),
 		(buybox_30d, "Buy Box: 30 days avg."),
 		(avg30.get("NEW"), "New: 30 days avg."),
+		(avg90.get("NEW"), "New: 90 days avg."),
+		(avg180.get("NEW"), "New: 180 days avg."),
 		(current.get("LISTPRICE"), "List Price: Current"),
 	]
+	# `if v` also filters 0, which is not a real offer price either.
 	best_price, best_price_source = next(((v, s) for v, s in chain if v), (None, None))
 
 	price_drop_30d = None
@@ -56,6 +73,28 @@ def resolve_best_price(stats_parsed):
 		"amz_buybox_30d": buybox_30d,
 		"amz_price_drop_30d": price_drop_30d,
 	}
+
+# Fields we refuse to blank out on a sync that came back with no offer at all.
+# B1: "When current is -1 but a previously stored real price exists, KEEP the
+# stored price, do not overwrite it." A discontinued product would otherwise
+# lose a perfectly good last-known price the first time it went out of stock,
+# and every margin/vs-Amazon figure derived from it would go with it.
+PRICE_FIELDS_TO_PRESERVE = ("amz_best_price", "amz_best_price_source")
+
+def apply_best_price(doc, resolved):
+	"""Write the resolved price block onto the Item, preserving the last known
+	price when this pull produced none.
+
+	The remaining fields (buybox current/30d, price drop) are point-in-time
+	diagnostics, so they are written as-is - reporting a stale "current" Buy
+	Box price would be actively misleading, unlike keeping a last-known best
+	price that is explicitly labelled by its source.
+	"""
+	for fieldname, value in resolved.items():
+		if value is None and fieldname in PRICE_FIELDS_TO_PRESERVE and doc.get(fieldname):
+			continue
+		doc.set(fieldname, value)
+		mark_system_field_modified(doc, fieldname)
 
 # Item Details fieldname -> Item fieldname. The two doctypes each carry
 # their own historical typo (variation_attribtutes on Item Details,
@@ -520,9 +559,7 @@ def _sync_keepa_item_internal(doc, event):
 
 						apply_price_history(doc, avg30, avg90, avg180, lowest, highest)
 
-					for fieldname, value in resolve_best_price(stats_parsed).items():
-						doc.set(fieldname, value)
-						mark_system_field_modified(doc, fieldname)
+					apply_best_price(doc, resolve_best_price(stats_parsed))
 
 					doc.amz_search_keywords = build_search_keywords(item_detail)
 					mark_system_field_modified(doc, "amz_search_keywords")
@@ -728,9 +765,7 @@ def _sync_keepa_item_internal(doc, event):
 
 						apply_price_history(doc, avg30, avg90, avg180, lowest, highest)
 
-					for fieldname, value in resolve_best_price(stats_parsed).items():
-						doc.set(fieldname, value)
-						mark_system_field_modified(doc, fieldname)
+					apply_best_price(doc, resolve_best_price(stats_parsed))
 
 					doc.amz_search_keywords = build_search_keywords(item_detail)
 					mark_system_field_modified(doc, "amz_search_keywords")
