@@ -277,9 +277,39 @@ def resolve_reviews(prod, stats_parsed):
 
 	return rating, count
 
+def latest_monthly_sold(prod):
+	"""B5 - Keepa does not always send the scalar `monthlySold`.
+
+	On the IN domain it frequently comes back null while the real figure sits in
+	`monthlySoldHistory`, a flat Keepa history array of [minute, value, minute,
+	value, ...]. Verified live on B074Z6B35N: monthlySold was null while the
+	history tail read [..., 7513496, -1, 7518540, 50, 7581292, -1] - i.e. the
+	last *real* value is 50, which is the figure Keepa's own UI shows, and the
+	trailing -1 is "not reported for this period" (the same -1-means-no-data
+	convention as the price fields). Reading only the scalar is why the form
+	showed 0.
+
+	Walk the history backwards and take the most recent non-negative value.
+	"""
+	scalar = prod.get("monthlySold")
+	if isinstance(scalar, (int, float)) and scalar >= 0:
+		return int(scalar)
+
+	hist = prod.get("monthlySoldHistory") or []
+	# values sit at the odd indices; step back two at a time
+	for i in range(len(hist) - 1, 0, -2):
+		value = hist[i]
+		if isinstance(value, (int, float)) and value >= 0:
+			return int(value)
+	return None
+
 def apply_monthly_sold(item_detail, prod):
-	"""B1.3"""
-	item_detail.amz_monthly_sold = prod.get("monthlySold")
+	"""B1.3 / B5"""
+	monthly_sold = latest_monthly_sold(prod)
+	# Don't blank a previously captured figure just because this pull had none -
+	# same reasoning as apply_best_price().
+	if monthly_sold is not None or not item_detail.get("amz_monthly_sold"):
+		item_detail.amz_monthly_sold = monthly_sold
 	last_sold_update = prod.get("lastSoldUpdate")
 	if last_sold_update:
 		epoch_time = (last_sold_update + 21564000) * 60000
