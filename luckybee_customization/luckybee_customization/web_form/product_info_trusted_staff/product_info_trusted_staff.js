@@ -2,6 +2,10 @@ frappe.ready(function() {
     // 1. Load media preview component & auto-redirection
     $.getScript("/assets/luckybee_customization/js/mobile_preview.js");
 
+    // 1b. A3/A4 - three labelled photo sections with camera-first capture,
+    // replacing the raw Lucky Bee Images grid on this form too.
+    $.getScript("/assets/luckybee_customization/js/photo_sections.js");
+
     // 2. Load ZXing library for camera EAN barcode scanning
     if (typeof ZXingBrowser === 'undefined') {
         $.getScript("https://unpkg.com/@zxing/browser@0.1.3/umd/zxing-browser.min.js", setup_ean_camera_scanner);
