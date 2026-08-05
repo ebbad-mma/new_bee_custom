@@ -1,4 +1,7 @@
 frappe.ready(function() {
+    // 0. Wrapping title + scanned-item/barcode strip, shared by every mobile form.
+    $.getScript("/assets/luckybee_customization/js/mobile_common.js");
+
     // 1. Load media preview component & auto-redirection
     $.getScript("/assets/luckybee_customization/js/mobile_preview.js");
 

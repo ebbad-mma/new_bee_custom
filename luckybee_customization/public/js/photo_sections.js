@@ -7,6 +7,21 @@
 //
 // Photos save immediately via api/item_photos.py rather than waiting for the form's
 // own Save - a phone that backgrounds a half-filled form otherwise loses the lot.
+
+// Tells mobile_preview.js not to draw its own (read-only, duplicate) strip of
+// the same photos. Set at load time, before either script has rendered
+// anything, because the two are fetched in parallel and either may win.
+window.lb_photo_sections_enabled = true;
+
+// Hide the raw grid and the Primary Image attach control - the sections are the
+// supported way in. Kept in the DOM so the web form's own value handling stays
+// intact. Called on every bootstrap tick rather than once: the controls are
+// rendered asynchronously and may well not exist yet when the panel is built.
+window.lb_hide_native_photo_controls = function () {
+    $('[data-fieldname="lb_images"]').closest('.form-group, .frappe-control').hide();
+    $('[data-fieldname="lb_primary_image"]').closest('.form-group, .frappe-control').hide();
+};
+
 window.render_photo_sections = function () {
     if (!frappe.web_form || !frappe.web_form.doc || !frappe.web_form.doc.name) return;
     if ($('#lb-photo-sections').length) return;
@@ -15,11 +30,14 @@ window.render_photo_sections = function () {
     const $form = $('form.web-form');
     if (!$form.length) return;
 
-    // Hide the raw grid - the sections below are the supported way in.
-    // Keep it in the DOM so the web form's own value handling stays intact.
-    const $grid = $('[data-fieldname="lb_images"]').closest('.form-group, .frappe-control');
-    if ($grid.length) $grid.hide();
-    $('[data-fieldname="lb_primary_image"]').closest('.form-group, .frappe-control').hide();
+    window.lb_hide_native_photo_controls();
+
+    // The media preview's "Our Photos" strip lists exactly the same photos as
+    // the sections below, minus the ability to do anything with them. Two
+    // identical rows of thumbnails on a phone screen is pure noise, so drop it
+    // and leave the preview to what it is uniquely for: Amazon reference vs
+    // current primary, side by side.
+    $('#our-photos-container').remove();
 
     const $panel = $(`
         <div id="lb-photo-sections" class="card p-3 mb-3 shadow-sm bg-light">
@@ -104,6 +122,20 @@ window.render_photo_sections = function () {
         }).join('');
 
         $body.html(sectionsHtml);
+        sync_primary_preview(data.primary_image);
+    }
+
+    // Photos are saved server-side here, so the media preview above (which read
+    // the primary off the doc once, at load) would otherwise sit there showing a
+    // stale image - or "No primary image" on an item that now has one.
+    function sync_primary_preview(primaryUrl) {
+        const $preview = $('#primary-preview-container');
+        if (!$preview.length) return;
+        if (primaryUrl) {
+            $preview.html(`<img src="${esc(primaryUrl)}" class="img-fluid" style="max-height: 150px; object-fit: contain;" />`);
+        } else {
+            $preview.html('<span class="text-muted small">No primary image.</span>');
+        }
     }
 
     function load() {
@@ -208,12 +240,33 @@ window.render_photo_sections = function () {
     load();
 };
 
-// Same belt-and-braces timing as the other mobile scripts: frappe.web_form.doc
-// is populated asynchronously and is often not ready when frappe.ready fires.
-// render_photo_sections() bails out if its panel already exists, so retrying is safe.
-frappe.ready(function () {
-    window.render_photo_sections();
-    setTimeout(window.render_photo_sections, 300);
-    setTimeout(window.render_photo_sections, 800);
-    setTimeout(window.render_photo_sections, 1500);
-});
+// This must NOT be wrapped in frappe.ready(). The file is pulled in with
+// $.getScript from each form's own .js, i.e. from inside a frappe.ready handler
+// that is already running. frappe.ready() only pushes onto frappe.ready_events,
+// and trigger_ready() walks that array once with forEach - anything appended
+// after the walk started is never visited. That is why the sections never
+// appeared on a real device and staff were still looking at the raw grid: the
+// callback below was registered and then simply dropped on the floor.
+//
+// Same belt-and-braces timing as the other mobile scripts otherwise:
+// frappe.web_form.doc is populated asynchronously, and both functions are
+// idempotent, so retrying is safe.
+(function () {
+    function tick() {
+        window.lb_hide_native_photo_controls();
+        // Also here, not only at panel creation: mobile_preview.js may not have
+        // drawn its duplicate strip yet the first time round.
+        $('#our-photos-container').remove();
+        window.render_photo_sections();
+    }
+    tick();
+    [300, 800, 1500, 2500].forEach(delay => setTimeout(tick, delay));
+
+    // The dependable signal, for a phone slow enough to outlast the retries
+    // above. Deliberately the events emitter and not frappe.web_form.after_load,
+    // which mobile_preview.js assigns to - .on() adds a handler instead of
+    // replacing whatever got there first.
+    if (frappe.web_form && frappe.web_form.events) {
+        frappe.web_form.events.on('after_load', tick);
+    }
+})();

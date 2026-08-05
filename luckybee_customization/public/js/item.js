@@ -12,6 +12,7 @@ frappe.ui.form.on('Item', {
         move_connections_tab_to_end(frm);
         render_velocity_dashboard(frm);
         render_amazon_image_gallery(frm);
+        render_lucky_bee_image_gallery(frm);
         render_supplier_history(frm);
         render_amazon_freshness(frm);
         add_refresh_amazon_button(frm);
@@ -312,6 +313,63 @@ function set_filter_in_subcat_on_the_basis_of_cat(frm) {
     });
 }
 
+// Our own photos, rendered as pictures. The lb_images grid can only print the
+// file path in its cell, so the section used to be a column of
+// "/private/files/capture_...jpg" with no way to see what was photographed.
+// Grouped by section (Out Box / In Box / Product) in the same order the mobile
+// capture form uses, with the primary shot marked.
+function render_lucky_bee_image_gallery(frm) {
+    const wrapper = frm.get_field('lb_image_gallery') && frm.get_field('lb_image_gallery').$wrapper;
+    if (!wrapper) return;
+
+    const rows = (frm.doc.lb_images || []).filter(r => r.image);
+    if (!rows.length) {
+        wrapper.html('<div class="text-muted small">No photos captured yet.</div>');
+        return;
+    }
+
+    const esc = s => frappe.utils.escape_html(s == null ? '' : String(s));
+    const primary = frm.doc.lb_primary_image;
+    const sections = ['Out Box', 'In Box', 'Product'];
+
+    // Anything captured before photo_section existed still has to show up.
+    const groups = {};
+    rows.forEach(r => {
+        const key = sections.includes(r.photo_section) ? r.photo_section : 'Uncategorised';
+        (groups[key] = groups[key] || []).push(r);
+    });
+
+    const order = sections.concat('Uncategorised').filter(s => groups[s]);
+
+    const html = order.map(section => {
+        const thumbs = groups[section]
+            .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+            .map(r => `
+                <a href="${esc(r.image)}" target="_blank" rel="noopener"
+                   style="display:inline-block; margin:0 8px 8px 0; text-align:center;
+                          text-decoration:none; color:inherit;">
+                    <img src="${esc(r.image)}"
+                         title="${esc(r.caption || r.image)}"
+                         style="width:90px; height:90px; object-fit:contain; border:1px solid var(--border-color); border-radius:6px; background:#fff;"
+                         onerror="this.closest('a').style.display='none'" />
+                    ${r.image === primary
+                        ? '<div class="text-success" style="font-size:10px; font-weight:600;">Primary</div>'
+                        : (r.caption ? `<div class="text-muted" style="font-size:10px;">${esc(r.caption)}</div>` : '')}
+                </a>
+            `).join('');
+
+        return `
+            <div style="margin-bottom:8px;">
+                <div class="text-muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.03em;">
+                    ${esc(section)} (${groups[section].length})
+                </div>
+                <div style="display:flex; flex-wrap:wrap; align-items:flex-start;">${thumbs}</div>
+            </div>`;
+    }).join('');
+
+    wrapper.html(html);
+}
+
 function render_amazon_image_gallery(frm) {
     const wrapper = frm.get_field('amz_image_gallery') && frm.get_field('amz_image_gallery').$wrapper;
     if (!wrapper) return;
@@ -473,3 +531,26 @@ function add_refresh_amazon_button(frm) {
         });
     });
 }
+
+// Keep the thumbnails honest while the grid is being edited - otherwise a photo
+// swapped or removed here still shows the old picture until the next reload.
+frappe.ui.form.on('Lucky Bee Images', {
+    image(frm) {
+        render_lucky_bee_image_gallery(frm);
+    },
+    photo_section(frm) {
+        render_lucky_bee_image_gallery(frm);
+    },
+    caption(frm) {
+        render_lucky_bee_image_gallery(frm);
+    }
+});
+
+frappe.ui.form.on('Item', {
+    lb_images_remove(frm) {
+        render_lucky_bee_image_gallery(frm);
+    },
+    lb_primary_image(frm) {
+        render_lucky_bee_image_gallery(frm);
+    }
+});

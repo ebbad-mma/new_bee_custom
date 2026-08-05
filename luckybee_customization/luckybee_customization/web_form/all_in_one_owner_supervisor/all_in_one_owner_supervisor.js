@@ -1,4 +1,7 @@
 frappe.ready(function() {
+    // Wrapping title + scanned-item/barcode strip, shared by every mobile form.
+    $.getScript("/assets/luckybee_customization/js/mobile_common.js");
+
     $.getScript("/assets/luckybee_customization/js/mobile_preview.js");
     // A3/A4 - same three-section camera-first capture as the Photos form.
     $.getScript("/assets/luckybee_customization/js/photo_sections.js");

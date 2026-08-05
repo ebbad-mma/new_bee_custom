@@ -1,4 +1,7 @@
 frappe.ready(function() {
+    // Wrapping title + scanned-item/barcode strip, shared by every mobile form.
+    $.getScript("/assets/luckybee_customization/js/mobile_common.js");
+
     // frappe.web_form.doc loads asynchronously - it is frequently NOT populated
     // yet when frappe.ready fires (confirmed live: on a real device the page
     // rendered only the bare, empty Save/Discard form with no Stock Count panel

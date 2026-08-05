@@ -1,6 +1,10 @@
 import unittest
 import frappe
-from luckybee_customization.api.mobile_forms import find_item_for_mobile, fetch_keepa_photo
+from luckybee_customization.api.mobile_forms import (
+    find_item_for_mobile,
+    fetch_keepa_photo,
+    get_mobile_item_header,
+)
 from luckybee_customization.api.stock_recount import get_stock_recount_context, submit_stock_recount
 from luckybee_customization.item_hooks import validate_role_field_permissions
 
@@ -76,6 +80,34 @@ class TestMobileFoundation(unittest.TestCase):
         frappe.get_roles = lambda *args, **kwargs: ["Owner-Supervisor"]
         res_owner = find_item_for_mobile("TESTSCAN_FOUNDATION_999")
         self.assertEqual(res_owner["redirect_url"], f"/item-owner-supervisor/{self.created_item_name}/edit")
+
+    def test_get_mobile_item_header(self):
+        """The header strip has to name the item and every code it can be scanned by."""
+        frappe.db.set_value("Item", self.created_item_name, "custom_barcode", "FLATBARCODE_111")
+        frappe.db.commit()
+
+        header = get_mobile_item_header(self.created_item_name)
+
+        self.assertEqual(header["item_code"], self.created_item_name)
+        self.assertEqual(header["item_name"], "Test Mobile Item 1")
+
+        values = [b["value"] for b in header["barcodes"]]
+        # The child-table barcode is the one a scan resolves against, so it leads.
+        self.assertEqual(values[0], "TESTSCAN_FOUNDATION_999")
+        self.assertIn("FLATBARCODE_111", values)
+        # No blanks, and no code listed twice - the strip is read at a glance.
+        self.assertEqual(len(values), len(set(values)))
+        self.assertTrue(all(v for v in values))
+
+    def test_get_mobile_item_header_without_barcodes(self):
+        """An item with nothing to scan still resolves - the strip just shows the code."""
+        frappe.db.delete("Item Barcode", {"parent": self.created_item_name})
+        frappe.db.commit()
+
+        header = get_mobile_item_header(self.created_item_name)
+
+        self.assertEqual(header["item_code"], self.created_item_name)
+        self.assertEqual(header["barcodes"], [])
 
     def test_validate_role_field_permissions_floor_staff(self):
         # Test that Floor Staff cannot edit standard item fields like cost/mrp, but can edit images

@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 import keepa
 
 @frappe.whitelist(allow_guest=True)
@@ -76,6 +77,68 @@ def find_item_for_mobile(search_term):
 
     target_form_name = matches[0][0] if matches else "photos-floor-staff"
     return {"status": "found", "item_code": item_code, "redirect_url": build_redirect(target_form_name)}
+
+# Barcode-ish fields carried by Item, in the order staff recognise them.
+# Checked against the meta before use - this list has to survive a field being
+# renamed or dropped without taking the whole header strip down with it.
+_BARCODE_FIELDS = (
+    ("custom_barcode", "Barcode"),
+    ("barcode", "Barcode"),
+    ("custom_legacy_barcode", "Legacy"),
+    ("ean", "EAN"),
+)
+
+
+@frappe.whitelist()
+def get_mobile_item_header(item_code):
+    """Identity strip for the mobile forms: which item, and which barcodes.
+
+    Every form shows this under the title so that after a scan the staff member
+    can see what they landed on. A mis-scan is otherwise invisible until the
+    wrong item has already been photographed or recounted.
+    """
+    if not frappe.session.user or frappe.session.user == "Guest":
+        frappe.throw(_("You must be logged in."), frappe.PermissionError)
+
+    if not frappe.has_permission("Item", "read", doc=item_code):
+        frappe.throw(_("Not permitted to view this item."), frappe.PermissionError)
+
+    meta = frappe.get_meta("Item")
+    fields = ["name", "item_name"] + [f for f, _label in _BARCODE_FIELDS if meta.has_field(f)]
+
+    item = frappe.db.get_value("Item", item_code, fields, as_dict=True)
+    if not item:
+        frappe.throw(_("Item not found."))
+
+    barcodes = []
+    seen = set()
+
+    def add(label, value):
+        value = (value or "").strip()
+        if value and value not in seen:
+            seen.add(value)
+            barcodes.append({"label": label, "value": value})
+
+    # The Item Barcode child table is the canonical place; the flat fields are
+    # what the older stock and the mobile forms actually write to.
+    for row in frappe.get_all(
+        "Item Barcode",
+        filters={"parent": item_code, "parenttype": "Item"},
+        fields=["barcode"],
+        order_by="idx asc",
+    ):
+        add("Barcode", row.barcode)
+
+    for fieldname, label in _BARCODE_FIELDS:
+        if meta.has_field(fieldname):
+            add(label, item.get(fieldname))
+
+    return {
+        "item_code": item.name,
+        "item_name": item.item_name,
+        "barcodes": barcodes,
+    }
+
 
 @frappe.whitelist(allow_guest=True)
 def fetch_keepa_photo(item_code):

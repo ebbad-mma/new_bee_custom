@@ -16,14 +16,21 @@ window.render_mobile_media_preview = function() {
     const container = $('<div id="mobile-media-preview" class="card mb-4 p-3 shadow-sm bg-light"></div>');
     container.insertBefore($form);
 
+    // On the forms that carry the three-section photo editor (photo_sections.js)
+    // this strip listed exactly the same photos again, read-only, directly above
+    // it - two identical rows of thumbnails on a phone screen. There, the
+    // preview earns its place only as the Amazon-vs-primary comparison.
+    const showOurPhotos = !window.lb_photo_sections_enabled;
+
     container.html(`
         <h5 class="mb-3">Media Preview</h5>
+        ${showOurPhotos ? `
         <div id="our-photos-container" class="mb-3">
             <h6 class="text-muted text-uppercase text-xs font-weight-bold">Our Photos</h6>
             <div class="d-flex overflow-auto gap-2" id="our-photos-list">
                 <span class="text-muted small">Loading...</span>
             </div>
-        </div>
+        </div>` : ''}
         <div class="row">
             <div class="col-6">
                 <h6 class="text-muted text-uppercase text-xs font-weight-bold">Amazon Reference</h6>
@@ -42,8 +49,9 @@ window.render_mobile_media_preview = function() {
 
     // Helper to render Our Photos list with primary image controls
     const render_our_photos = (currentPrimary) => {
-        const images = frappe.web_form.doc.lb_images || [];
         const $ourPhotos = container.find('#our-photos-list');
+        if (!$ourPhotos.length) return;   // three-section editor owns the photos here
+        const images = frappe.web_form.doc.lb_images || [];
         if (images.length > 0) {
             $ourPhotos.empty();
             images.forEach(img => {

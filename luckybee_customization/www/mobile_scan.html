@@ -56,6 +56,9 @@
 
     <div id="task-picker-card" class="card p-3 shadow-sm text-center mt-4" style="display: none;">
         <h4>What are you doing with this item?</h4>
+        <!-- Which code was actually read, and which item it resolved to - a
+             mis-scan is otherwise only noticed after the form is open. -->
+        <div id="task-picker-scanned" class="small text-muted mt-1"></div>
         <div id="task-picker-options" class="d-grid gap-2 mt-3"></div>
     </div>
 </div>
@@ -111,12 +114,24 @@ frappe.ready(function() {
     const fileInput = document.getElementById('barcode-image-upload');
     const taskPickerCard = document.getElementById('task-picker-card');
     const taskPickerOptions = document.getElementById('task-picker-options');
+    const taskPickerScanned = document.getElementById('task-picker-scanned');
 
-    const showTaskPicker = (options) => {
+    // Carry the scanned code onto the form page so it can show what was scanned
+    // in its header strip (see public/js/mobile_common.js) - staff otherwise
+    // land on a form with no way to tell a mis-scan from the right item.
+    const withScanned = (url, term) => {
+        if (!url || !term) return url;
+        return url + (url.indexOf('?') === -1 ? '?' : '&') + 'scanned=' + encodeURIComponent(term);
+    };
+
+    const showTaskPicker = (options, term, itemCode) => {
+        taskPickerScanned.textContent = itemCode
+            ? `Scanned ${term} → ${itemCode}`
+            : '';
         taskPickerOptions.innerHTML = '';
         options.forEach(opt => {
             const btn = document.createElement('a');
-            btn.href = opt.redirect_url;
+            btn.href = withScanned(opt.redirect_url, term);
             btn.className = 'btn btn-outline-primary text-start';
             btn.innerHTML = `<strong>${opt.role}</strong><br><span class="small text-muted">${opt.task}</span>`;
             taskPickerOptions.appendChild(btn);
@@ -197,10 +212,10 @@ frappe.ready(function() {
                 if (r.message && r.message.status === 'found') {
                     if (controls) controls.stop();
                     // Redirect to Web Form
-                    window.location.href = r.message.redirect_url;
+                    window.location.href = withScanned(r.message.redirect_url, term);
                 } else if (r.message && r.message.status === 'choose') {
                     if (controls) controls.stop();
-                    showTaskPicker(r.message.options);
+                    showTaskPicker(r.message.options, term, r.message.item_code);
                 } else {
                     searchAlert.innerText = "Item not found.";
                     searchAlert.style.display = "block";
