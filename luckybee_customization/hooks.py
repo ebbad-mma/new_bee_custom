@@ -152,7 +152,11 @@ scheduler_events = {
         "luckybee_customization.jobs.refresh_velocity"
     ],
     "hourly": [
-        "luckybee_customization.overrides.item_utils.update_item_in_woocom"
+        "luckybee_customization.overrides.item_utils.update_item_in_woocom",
+        # B2 - drains the ASIN-matched backlog a bounded batch at a time. Keepa
+        # refills at a fixed token rate, so a full sweep spans many hours; this
+        # is resumable by design and stops cleanly when tokens run low.
+        "luckybee_customization.jobs_keepa.bulk_keepa_sync_scheduled"
     ]
 }
 
