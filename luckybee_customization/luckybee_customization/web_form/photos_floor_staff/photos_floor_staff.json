@@ -45,6 +45,7 @@
    "label": "Lucky Bee Images",
    "max_length": 0,
    "max_value": 0,
+   "options": "Lucky Bee Images",
    "precision": "",
    "read_only": 0,
    "reqd": 0,

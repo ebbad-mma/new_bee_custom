@@ -40,7 +40,40 @@
 <script src="https://unpkg.com/@zxing/browser@0.1.3/umd/zxing-browser.min.js"></script>
 <script>
 frappe.ready(function() {
-    const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+    // Our labels are alphanumeric internal codes (LX01416, LSA00007, L11873...), which are
+    // Code 128 / Code 39 - NOT the numeric-only EAN/UPC retail symbologies. The reader was
+    // previously constructed with no hints at all, so dense 1D codes frequently never
+    // resolved. Enable the 1D symbologies explicitly and turn on TRY_HARDER.
+    //
+    // Enum values below were read directly out of @zxing/browser@0.1.3's UMD bundle:
+    // BarcodeFormat is exported on the global, but DecodeHintType is NOT (minification
+    // drops the enum's name), so the two hint keys are given as their verified literals:
+    //   DecodeHintType.POSSIBLE_FORMATS = 2, DecodeHintType.TRY_HARDER = 3
+    const BF = (ZXingBrowser && ZXingBrowser.BarcodeFormat) || {
+        CODABAR: 1, CODE_39: 2, CODE_93: 3, CODE_128: 4,
+        EAN_8: 6, EAN_13: 7, ITF: 8, UPC_A: 14, UPC_E: 15
+    };
+    const HINT_POSSIBLE_FORMATS = 2;
+    const HINT_TRY_HARDER = 3;
+
+    const scanHints = new Map();
+    scanHints.set(HINT_POSSIBLE_FORMATS, [
+        BF.CODE_128,   // our LX / LSA / L-series labels
+        BF.CODE_39,    // older/alternate label printers
+        BF.CODE_93,
+        BF.CODABAR,
+        BF.ITF,
+        BF.EAN_13,     // keep retail formats for supplier barcodes
+        BF.EAN_8,
+        BF.UPC_A,
+        BF.UPC_E
+    ]);
+    scanHints.set(HINT_TRY_HARDER, true);
+
+    const codeReader = new ZXingBrowser.BrowserMultiFormatReader(scanHints, {
+        // Scan a little more often than the default; dense Code 128 needs more attempts.
+        delayBetweenScanAttempts: 100
+    });
     let controls = null;
     let selectedDeviceId = null;
 
@@ -167,25 +200,47 @@ frappe.ready(function() {
         
         try {
             const deviceIdToUse = selectedDeviceId || undefined;
-            controls = await codeReader.decodeFromVideoDevice(
-                deviceIdToUse,
-                videoElement,
-                (result, err) => {
-                    if (result) {
-                        if (controls) {
-                            controls.stop();
-                            controls = null;
-                        }
-                        stopBtn.style.display = 'none';
-                        startBtn.style.display = 'block';
-                        scannerWrapper.style.display = 'none';
-                        const text = result.getText();
-                        searchInput.value = text;
-                        triggerSearch(text);
+
+            // Request a high-resolution rear-facing stream. The browser default is often
+            // 640x480, which does not carry enough pixels across the bars of a dense
+            // Code 128 label for the decoder to lock on. Fall back to the plain
+            // device-id call if the browser rejects the constraints.
+            const videoConstraints = {
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            };
+            if (deviceIdToUse) {
+                videoConstraints.deviceId = { exact: deviceIdToUse };
+            } else {
+                videoConstraints.facingMode = { ideal: 'environment' };
+            }
+
+            const onDecode = (result, err) => {
+                if (result) {
+                    if (controls) {
+                        controls.stop();
+                        controls = null;
                     }
+                    stopBtn.style.display = 'none';
+                    startBtn.style.display = 'block';
+                    scannerWrapper.style.display = 'none';
+                    const text = result.getText();
+                    searchInput.value = text;
+                    triggerSearch(text);
                 }
-            );
-            
+            };
+
+            if (typeof codeReader.decodeFromConstraints === 'function') {
+                controls = await codeReader.decodeFromConstraints(
+                    { video: videoConstraints }, videoElement, onDecode
+                );
+            } else {
+                controls = await codeReader.decodeFromVideoDevice(
+                    deviceIdToUse, videoElement, onDecode
+                );
+            }
+
+
             // Populate camera select dropdown once permission is granted
             if (cameraSelect.options.length === 0) {
                 getDevices().then(devices => {
@@ -214,7 +269,18 @@ frappe.ready(function() {
     };
 
     startBtn.addEventListener('click', startScanning);
-    
+
+    // "Scan Next" on the count/photo forms returns here with ?autoscan=1 so the camera
+    // reopens immediately instead of making staff tap Start again for every item.
+    try {
+        if (new URLSearchParams(window.location.search).get('autoscan') === '1') {
+            startScanning();
+        }
+    } catch (e) {
+        // URLSearchParams unavailable on a very old browser - harmless, staff tap Start.
+    }
+
+
     stopBtn.addEventListener('click', () => {
         if (controls) {
             controls.stop();

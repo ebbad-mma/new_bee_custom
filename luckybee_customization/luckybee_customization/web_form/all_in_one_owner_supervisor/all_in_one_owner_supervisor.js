@@ -290,7 +290,9 @@ frappe.ready(function() {
                 </div>
                 <div class="form-group">
                     <label class="small text-muted">New Count (leave blank to skip)</label>
-                    <input type="number" id="count-new-qty" class="form-control" min="0" step="any" placeholder="Only enter this to change stock">
+                    <input type="number" id="count-new-qty" class="form-control" min="0" step="any"
+                           inputmode="numeric" autocomplete="off" placeholder="Only enter this to change stock">
+                    <div id="count-delta" class="small mt-1"></div>
                 </div>
                 <button type="button" id="count-submit-btn" class="btn btn-outline-primary btn-block">Update Stock</button>
                 <div id="count-status" class="mt-2 small"></div>
@@ -299,14 +301,41 @@ frappe.ready(function() {
             const $warehouseSelect = $body.find('#count-warehouse');
             const $newQty = $body.find('#count-new-qty');
             const $status = $body.find('#count-status');
+            const $delta = $body.find('#count-delta');
 
             function currentQtyForSelected() {
                 return parseFloat($warehouseSelect.find('option:selected').data('current-qty'));
             }
 
+            // Same live "12 to 3 (-9)" safeguard as the dedicated Count form - a large
+            // unexpected swing is visible before the confirm dialog is ever reached.
+            // Deliberately no autofocus here: on this form the count is optional and
+            // secondary, so stealing focus from the product fields would be wrong.
+            function renderDelta() {
+                const raw = $newQty.val();
+                const entered = parseFloat(raw);
+                if (raw === '' || raw === null || isNaN(entered)) {
+                    $delta.text('').removeClass('text-danger text-success text-muted');
+                    return;
+                }
+                const current = currentQtyForSelected();
+                const diff = entered - current;
+                $delta.removeClass('text-danger text-success text-muted');
+                if (diff === 0) {
+                    $delta.addClass('text-muted').text('No change');
+                    return;
+                }
+                const sign = diff > 0 ? '+' : '';
+                $delta.addClass(diff > 0 ? 'text-success' : 'text-danger')
+                      .text(`${current} to ${entered} (${sign}${diff})`);
+            }
+
+            $newQty.on('input', renderDelta);
+
             $warehouseSelect.on('change', function() {
                 $body.find('#count-current-qty').val(`${currentQtyForSelected()} ${ctx.stock_uom || ''}`);
                 $status.text('');
+                renderDelta();
             });
 
             $body.find('#count-submit-btn').on('click', function() {

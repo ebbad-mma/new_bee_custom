@@ -82,7 +82,9 @@ frappe.ready(function() {
                 </div>
                 <div class="form-group">
                     <label class="small text-muted">New Count</label>
-                    <input type="number" id="count-new-qty" class="form-control" min="0" step="any" placeholder="Enter counted quantity">
+                    <input type="number" id="count-new-qty" class="form-control" min="0" step="any"
+                           inputmode="numeric" autocomplete="off" placeholder="Enter counted quantity">
+                    <div id="count-delta" class="small mt-1"></div>
                 </div>
                 <button type="button" id="count-submit-btn" class="btn btn-primary btn-block">Update Stock</button>
                 <div id="count-status" class="mt-2 small"></div>
@@ -92,16 +94,67 @@ frappe.ready(function() {
             const $currentQty = $body.find('#count-current-qty');
             const $newQty = $body.find('#count-new-qty');
             const $status = $body.find('#count-status');
+            const $delta = $body.find('#count-delta');
 
             function currentQtyForSelected() {
                 const opt = $warehouseSelect.find('option:selected');
                 return parseFloat(opt.data('current-qty'));
             }
 
+            // Live "12 to 3 (-9)" readout under the entry box. A large unexpected swing is
+            // visible before the staff member ever reaches the confirm dialog, which is the
+            // real safeguard against a 3-for-30 style typo.
+            function renderDelta() {
+                const raw = $newQty.val();
+                if (raw === '' || raw === null) {
+                    $delta.text('').removeClass('text-danger text-success text-muted');
+                    return;
+                }
+                const entered = parseFloat(raw);
+                if (isNaN(entered)) {
+                    $delta.text('').removeClass('text-danger text-success text-muted');
+                    return;
+                }
+                const current = currentQtyForSelected();
+                const diff = entered - current;
+                $delta.removeClass('text-danger text-success text-muted');
+                if (diff === 0) {
+                    $delta.addClass('text-muted').text('No change');
+                    return;
+                }
+                const sign = diff > 0 ? '+' : '';
+                $delta.addClass(diff > 0 ? 'text-success' : 'text-danger')
+                      .text(`${current} to ${entered} (${sign}${diff})`);
+            }
+
+            $newQty.on('input', renderDelta);
+
+            // Staff can start typing the count immediately without tapping the field first.
+            $newQty.trigger('focus');
+
             $warehouseSelect.on('change', function() {
                 $currentQty.val(`${currentQtyForSelected()} ${ctx.stock_uom || ''}`);
                 $status.text('');
+                renderDelta();
             });
+
+            // Replace the form with a clear result + a big "Scan Next" action, rather than
+            // silently bouncing back to the scanner. Staff get confirmation that the change
+            // landed, and one obvious tap to start the next item.
+            function showDone(message) {
+                $body.html(`
+                    <div class="text-center py-2">
+                        <div class="mb-2" style="font-size: 32px; line-height: 1;">&#10003;</div>
+                        <div class="font-weight-bold mb-1">${frappe.utils.escape_html(message)}</div>
+                        <div class="small text-muted mb-3">${frappe.utils.escape_html(ctx.item_name || itemCode)}</div>
+                        <button type="button" id="count-scan-next" class="btn btn-primary btn-block btn-lg">Scan Next</button>
+                    </div>
+                `);
+                $body.find('#count-scan-next').on('click', function() {
+                    // autoscan tells /mobile_scan to open the camera straight away
+                    window.location.href = '/mobile_scan?autoscan=1';
+                });
+            }
 
             $body.find('#count-submit-btn').on('click', function() {
                 $status.removeClass('text-danger text-success').text('');
@@ -136,11 +189,9 @@ frappe.ready(function() {
                                     return;
                                 }
                                 if (res.status === 'no_change') {
-                                    $status.addClass('text-success').text('Stock already matches this count - nothing to update.');
-                                    setTimeout(() => { window.location.href = '/mobile_scan'; }, 1200);
+                                    showDone('Stock already matches this count - nothing to update.');
                                 } else if (res.status === 'success') {
-                                    $status.addClass('text-success').text(`Stock updated (${res.stock_reconciliation}). Redirecting&hellip;`);
-                                    setTimeout(() => { window.location.href = '/mobile_scan'; }, 1200);
+                                    showDone(`Updated - stock is now ${res.new_qty}.`);
                                 } else {
                                     $status.addClass('text-danger').text('Something went wrong. Nothing was changed.');
                                 }
