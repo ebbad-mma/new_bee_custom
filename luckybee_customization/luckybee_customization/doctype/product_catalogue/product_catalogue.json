@@ -1,0 +1,159 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "format:CAT-{#####}",
+ "creation": "2026-08-06 16:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "catalogue_title",
+  "catalogue_type",
+  "brand",
+  "supplier",
+  "column_break_source",
+  "date_uploaded",
+  "valid_from",
+  "valid_to",
+  "section_break_file",
+  "catalogue_file",
+  "section_break_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "catalogue_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Catalogue Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "catalogue_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Catalogue Type",
+   "options": "Brand\nImporter / Supplier",
+   "reqd": 1
+  },
+  {
+   "description": "Whose catalogue this is, when it is a brand catalogue.",
+   "fieldname": "brand",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Brand",
+   "options": "Brand"
+  },
+  {
+   "description": "Which supplier or importer it came from.",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Supplier",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "column_break_source",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date_uploaded",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date Uploaded"
+  },
+  {
+   "description": "Only if the catalogue is season or price dated.",
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "label": "Valid From"
+  },
+  {
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "label": "Valid To"
+  },
+  {
+   "fieldname": "section_break_file",
+   "fieldtype": "Section Break",
+   "label": "Catalogue File"
+  },
+  {
+   "fieldname": "catalogue_file",
+   "fieldtype": "Attach",
+   "label": "Catalogue File"
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Items",
+   "link_doctype": "Item",
+   "link_fieldname": "pb_linked_catalogue"
+  }
+ ],
+ "modified": "2026-08-06 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "luckybee_customization",
+ "name": "Product Catalogue",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Item Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Trusted Staff"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Owner-Supervisor",
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "search_fields": "catalogue_title,brand,supplier",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "catalogue_title",
+ "track_changes": 1
+}

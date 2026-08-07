@@ -11,7 +11,12 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/luckybee_customization/css/luckybee_customization.css"
-app_include_js = "/assets/luckybee_customization/js/dashboard_master_filter.js"
+app_include_js = [
+    "/assets/luckybee_customization/js/dashboard_master_filter.js",
+    # Read-only product lookup - loaded across Desk so staff can scan from
+    # wherever they happen to be (Ctrl/Cmd+Shift+F).
+    "/assets/luckybee_customization/js/scan_lookup.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/luckybee_customization/css/luckybee_customization.css"
@@ -68,10 +73,14 @@ doctype_list_js = {
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "luckybee_customization.utils.jinja_methods",
-# 	"filters": "luckybee_customization.utils.jinja_filters"
-# }
+# The product label needs a server-rendered barcode, which the restricted Jinja
+# sandbox in print formats cannot produce on its own.
+jinja = {
+	"methods": [
+		"luckybee_customization.jinja_methods.lb_label_data",
+		"luckybee_customization.jinja_methods.lb_barcode_svg",
+	]
+}
 
 # Installation
 # ------------

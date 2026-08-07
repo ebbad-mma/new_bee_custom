@@ -16,6 +16,7 @@ frappe.ui.form.on('Item', {
         render_supplier_history(frm);
         render_amazon_freshness(frm);
         add_refresh_amazon_button(frm);
+        add_label_buttons(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -554,3 +555,37 @@ frappe.ui.form.on('Item', {
         render_lucky_bee_image_gallery(frm);
     }
 });
+
+// Phase 2 section 4.3 - Design/Preview and Print buttons for the product label.
+// Grouped under "Label" so they do not crowd the header alongside Product
+// Finder and Refresh Amazon Data.
+function add_label_buttons(frm) {
+    if (frm.is_new()) return;
+
+    frm.add_custom_button(__('Design / Preview Label'), function () {
+        // The standard print view, which is the preview - staff see exactly what
+        // will come out of the printer, on the same 50x25mm page box.
+        const url = frappe.urllib.get_full_url(
+            '/printview?doctype=' + encodeURIComponent(frm.doc.doctype)
+            + '&name=' + encodeURIComponent(frm.doc.name)
+            + '&format=Product%20Label&no_letterhead=1&_lang=en'
+        );
+        window.open(url, '_blank');
+    }, __('Label'));
+
+    frm.add_custom_button(__('Print Barcode Label'), function () {
+        // Same format, opened straight into the browser print dialog.
+        const w = window.open(frappe.urllib.get_full_url(
+            '/printview?doctype=' + encodeURIComponent(frm.doc.doctype)
+            + '&name=' + encodeURIComponent(frm.doc.name)
+            + '&format=Product%20Label&no_letterhead=1&trigger_print=1&_lang=en'
+        ), '_blank');
+        if (!w) {
+            frappe.msgprint({
+                title: __('Popup blocked'),
+                message: __('Allow popups for this site to print labels.'),
+                indicator: 'orange'
+            });
+        }
+    }, __('Label'));
+}
