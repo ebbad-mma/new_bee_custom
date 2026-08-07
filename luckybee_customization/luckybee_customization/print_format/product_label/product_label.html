@@ -44,14 +44,51 @@
 <style>
   /* Exact stock size. Without this the browser paginates onto A4 and the
      label prints in the corner of a full sheet. */
+  /* Frappe's own print CSS (templates/print_format/print_format.css) sizes the
+     sheet from GLOBAL Print Settings and forces the body to A4:
+
+       @page { size: {{ print_settings.pdf_page_size or 'A4' }} portrait; ... }
+       body  { min-width/max-width: <body_width>mm !important }
+       @media screen { body { min-height: 297mm; ... } }
+
+     That is why the label first came out adrift in the corner of an A4 sheet.
+     Page size is global, so it cannot be set for this format alone without
+     changing every other print format in the system - so it is overridden
+     here. This block is emitted after Frappe's, so it wins on cascade order;
+     !important is required because theirs carries it too. */
   @page {
     size: 50mm 25mm;
     margin: 0;
   }
 
   html, body {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-width: 50mm !important;
+    max-width: 50mm !important;
+    min-height: 25mm !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  /* The preview must show the real label at the real size - a preview that
+     shows something other than what prints is worse than no preview. */
+  @media screen {
+    body {
+      margin: 1.5rem auto !important;
+      height: 25mm !important;
+      min-height: 25mm !important;
+      outline: 1px dashed #bbb;   /* marks the physical label edge, screen only */
+    }
+  }
+
+  /* Frappe wraps the format in .print-format, which brings its own padding
+     and minimum height. */
+  .print-format {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    width: 50mm !important;
   }
 
   .lb-label {
