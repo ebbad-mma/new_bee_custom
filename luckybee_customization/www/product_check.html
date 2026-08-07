@@ -1,0 +1,368 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Price Check{% endblock %}
+
+{% block page_content %}
+<style>
+    .pc-wrap { max-width: 560px; margin: 0 auto; padding-bottom: 3rem; }
+    #pc-video { width: 100%; border-radius: 8px; background: #000; display: block; }
+    .pc-card { border: 1px solid #e2e2e2; border-radius: 10px; padding: 16px; margin-top: 18px; }
+    .pc-name { font-size: 17px; font-weight: 600; line-height: 1.3; }
+    .pc-meta { color: #6c757d; font-size: 13px; margin-top: 2px; }
+    .pc-price { font-size: 32px; font-weight: 700; margin-top: 10px; }
+    .pc-mrp { color: #6c757d; text-decoration: line-through; font-size: 15px; margin-left: 8px; }
+    .pc-save { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 4px;
+               background: #e8f5e9; color: #1b5e20; font-weight: 600; font-size: 14px; }
+    .pc-img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px;
+              background: #fafafa; margin-bottom: 12px; }
+    .pc-stock { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #ddd; font-size: 14px; }
+    .pc-stock-row { display: flex; justify-content: space-between; padding: 2px 0; }
+    .pc-links a { display: inline-block; margin: 10px 8px 0 0; font-size: 14px; }
+    .pc-hint { font-size: 12px; color: #888; margin-top: 10px; }
+</style>
+
+<div class="pc-wrap">
+    <h3>Price Check</h3>
+    <p class="text-muted" style="font-size:14px;">
+        Point the camera at the barcode on the label, or type the code below.
+    </p>
+
+    <div id="pc-scanner" style="display:none;">
+        <video id="pc-video" playsinline muted></video>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+            <button type="button" id="pc-torch" class="btn btn-outline-secondary btn-sm" style="display:none;">
+                Light
+            </button>
+            <div id="pc-zoom-wrap" style="display:none; flex:1; align-items:center; gap:6px;">
+                <input type="range" id="pc-zoom" class="form-range" style="width:100%;">
+            </div>
+            <button type="button" id="pc-stop" class="btn btn-outline-secondary btn-sm">Stop</button>
+        </div>
+    </div>
+
+    <button type="button" id="pc-start" class="btn btn-primary btn-block" style="width:100%;">
+        Scan a barcode
+    </button>
+
+    <div style="display:flex; gap:8px; margin-top:12px;">
+        <input type="text" id="pc-input" class="form-control" placeholder="Or type the code">
+        <button type="button" id="pc-search" class="btn btn-outline-primary">Check</button>
+    </div>
+
+    <div id="pc-alert" class="alert alert-warning" style="display:none; margin-top:12px;"></div>
+    <div id="pc-result"></div>
+</div>
+
+<script src="https://unpkg.com/@zxing/browser@0.1.3/umd/zxing-browser.min.js"></script>
+<script>
+frappe.ready(function () {
+    // Staff see stock in hand as well; customers never do. This only decides
+    // what the page asks for - the API refuses a guest either way.
+    const IS_STAFF = {{ "true" if is_staff else "false" }};
+
+    // Same hint set as the stock-take scanner: our labels are alphanumeric
+    // Code 128, not the numeric retail symbologies, and TRY_HARDER matters on
+    // dense codes. Literals verified against @zxing/browser@0.1.3's UMD bundle -
+    // DecodeHintType is dropped by minification, so it cannot be referenced.
+    const BF = (window.ZXingBrowser && ZXingBrowser.BarcodeFormat) || {
+        CODABAR: 1, CODE_39: 2, CODE_93: 3, CODE_128: 4,
+        EAN_8: 6, EAN_13: 7, ITF: 8, UPC_A: 14, UPC_E: 15
+    };
+    const hints = new Map();
+    hints.set(2, [BF.CODE_128, BF.CODE_39, BF.CODE_93, BF.CODABAR, BF.ITF,
+                  BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E]);
+    hints.set(3, true);
+
+    const reader = new ZXingBrowser.BrowserMultiFormatReader(hints,
+        { delayBetweenScanAttempts: 100 });
+
+    const video = document.getElementById('pc-video');
+    const startBtn = document.getElementById('pc-start');
+    const stopBtn = document.getElementById('pc-stop');
+    const scanner = document.getElementById('pc-scanner');
+    const input = document.getElementById('pc-input');
+    const alertBox = document.getElementById('pc-alert');
+    const result = document.getElementById('pc-result');
+
+    let stream = null, running = false, native = null;
+
+    const say = (msg) => {
+        alertBox.innerText = msg;
+        alertBox.style.display = msg ? 'block' : 'none';
+    };
+
+    const money = (n) => '₹' + Number(n || 0).toLocaleString('en-IN',
+        { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // --- rendering -----------------------------------------------------------
+    const render = (d, stock) => {
+        const img = d.image
+            ? `<img class="pc-img" src="${frappe.utils.escape_html(d.image)}">` : '';
+        const mrp = (d.mrp && d.mrp > d.our_price)
+            ? `<span class="pc-mrp">${money(d.mrp)}</span>` : '';
+        const save = d.save_amount > 0
+            ? `<div><span class="pc-save">You save ${money(d.save_amount)}</span></div>` : '';
+
+        // Brand and category only ever arrive on the staff payload.
+        const meta = (stock ? [stock.brand, stock.category] : []).filter(Boolean)
+            .map(frappe.utils.escape_html).join(' · ');
+
+        const stars = (d.rating && d.rating.rating)
+            ? `<div class="pc-meta">★ ${d.rating.rating} / 5
+               ${d.rating.count ? '(' + d.rating.count.toLocaleString('en-IN') + ' ratings)' : ''}</div>`
+            : '';
+
+        // Descriptions are currently the item name echoed back on almost every
+        // product, so only show one when it actually adds something.
+        const plain = (d.description || '').replace(/<[^>]*>/g, '').trim();
+        const desc = (plain && plain !== d.item_name && plain !== d.item_code
+                      && plain.length > 20)
+            ? `<div class="pc-meta" style="margin-top:10px;">${frappe.utils.escape_html(plain)}</div>` : '';
+
+        // A marketplace price is Keepa-cached, so it always carries the date it
+        // was taken - an undated figure invites treating a stale price as today's.
+        const mk = d.marketplace || {};
+        const shop = (name, label, o) => {
+            if (!o) return '';
+            const price = o.price
+                ? `${label} ${money(o.price)}${o.as_of ? ' (as of ' + o.as_of + ')' : ''}`
+                : `Check price on ${label}`;
+            return `<a href="${o.url}" target="_blank" rel="noopener nofollow">${price}</a>`;
+        };
+        const linkParts = [shop('amazon', 'Amazon', mk.amazon),
+                           shop('flipkart', 'Flipkart', mk.flipkart)].filter(Boolean);
+        const links = linkParts.length
+            ? `<div class="pc-links">${linkParts.join('')}</div>` : '';
+
+        let staffHtml = '';
+        if (IS_STAFF && stock) {
+            const rows = (stock.stock || []).map(s =>
+                `<div class="pc-stock-row"><span>${frappe.utils.escape_html(s.warehouse)}</span>
+                 <b>${s.qty}</b></div>`).join('');
+
+            const velocity = (stock.velocity_band || stock.days_cover != null)
+                ? `<div class="pc-stock-row"><span>Velocity</span><b>
+                   ${frappe.utils.escape_html(stock.velocity_band || '-')}
+                   ${stock.days_cover != null ? ' · ' + stock.days_cover + ' days cover' : ''}</b></div>`
+                : '';
+
+            const codes = (stock.codes || []).length
+                ? `<div class="pc-stock-row"><span>Codes</span>
+                   <b>${(stock.codes).map(frappe.utils.escape_html).join(', ')}</b></div>` : '';
+
+            // Senior staff only, and only when a real cost exists - see _costing().
+            let costing = '';
+            if (stock.costing) {
+                costing = stock.costing.available
+                    ? `<div class="pc-stock-row"><span>Cost / Margin</span>
+                       <b>${money(stock.costing.cost)} · ${stock.costing.margin_pct}%</b></div>`
+                    : `<div class="pc-stock-row"><span>Cost / Margin</span>
+                       <span class="text-muted">${frappe.utils.escape_html(stock.costing.reason)}</span></div>`;
+            }
+
+            staffHtml = `<div class="pc-stock">
+                <div class="pc-stock-row"><span><b>Stock in hand</b></span>
+                     <b>${stock.total_stock || 0}</b></div>
+                ${rows}${velocity}${codes}${costing}
+            </div>`;
+        }
+
+        result.innerHTML = `<div class="pc-card">
+            ${img}
+            <div class="pc-name">${frappe.utils.escape_html(d.item_name || '')}</div>
+            ${meta ? `<div class="pc-meta">${meta}</div>` : ''}
+            ${stars}
+            <div class="pc-price">${money(d.our_price)}${mrp}</div>
+            ${save}
+            ${desc}
+            ${links}
+            ${staffHtml}
+        </div>`;
+    };
+
+    // --- lookup --------------------------------------------------------------
+    const lookup = (term) => {
+        if (!term) return;
+        say('');
+        result.innerHTML = '<div class="text-muted" style="margin-top:14px;">Checking...</div>';
+
+        frappe.call({
+            method: 'luckybee_customization.api.scan_lookup.lookup_product_public',
+            args: { search_term: term },
+            callback: function (r) {
+                const d = (r && r.message) || {};
+                if (d.status !== 'found') {
+                    result.innerHTML = '';
+                    say(d.message || 'No product matches that code.');
+                    return;
+                }
+                if (!IS_STAFF) { render(d, null); return; }
+                // Staff get the stock figures from the permission-checked endpoint.
+                frappe.call({
+                    method: 'luckybee_customization.api.scan_lookup.lookup_product',
+                    args: { search_term: term },
+                    callback: (r2) => render(d, (r2 && r2.message) || null),
+                    error: () => render(d, null)
+                });
+            },
+            error: function () {
+                result.innerHTML = '';
+                say('Could not check that code. Please try again.');
+            }
+        });
+    };
+
+    const onCode = (text) => {
+        if (!text) return;
+        stop();
+        input.value = text;
+        lookup(text);
+    };
+
+    // --- camera --------------------------------------------------------------
+    // Native BarcodeDetector where it exists (Android Chrome): hardware
+    // accelerated, reads any orientation, and fast enough to feel instant.
+    // Otherwise ZXing on a cropped centre strip, tried upright then rotated,
+    // because our labels print the bars sideways and a 1D decoder only reads
+    // scan lines across the bars.
+    const initNative = async () => {
+        if (!('BarcodeDetector' in window)) return null;
+        try {
+            const supported = await window.BarcodeDetector.getSupportedFormats();
+            const wanted = ['code_128', 'code_39', 'code_93', 'codabar', 'itf',
+                            'ean_13', 'ean_8', 'upc_a', 'upc_e']
+                .filter(f => supported.includes(f));
+            if (!wanted.length) return null;
+            return new window.BarcodeDetector({ formats: wanted });
+        } catch (e) { return null; }
+    };
+
+    const cropCanvas = document.createElement('canvas');
+    const rotCanvas = document.createElement('canvas');
+
+    const zxingDecode = (canvas) => {
+        try {
+            const res = reader.decodeFromCanvas(canvas);
+            return res && res.getText ? res.getText() : null;
+        } catch (e) { return null; }
+    };
+
+    const scanFrame = () => {
+        const w = video.videoWidth, h = video.videoHeight;
+        if (!w || !h) return null;
+
+        // Centre strip only - far fewer pixels than a full 1080p frame, which is
+        // what made the old full-frame decode too slow to catch anything.
+        const cw = Math.floor(w * 0.9), ch = Math.floor(h * 0.5);
+        cropCanvas.width = cw; cropCanvas.height = ch;
+        cropCanvas.getContext('2d').drawImage(
+            video, Math.floor((w - cw) / 2), Math.floor((h - ch) / 2), cw, ch, 0, 0, cw, ch);
+
+        const upright = zxingDecode(cropCanvas);
+        if (upright) return upright;
+
+        rotCanvas.width = ch; rotCanvas.height = cw;
+        const rc = rotCanvas.getContext('2d');
+        rc.save();
+        rc.translate(ch / 2, cw / 2);
+        rc.rotate(Math.PI / 2);
+        rc.drawImage(cropCanvas, -cw / 2, -ch / 2);
+        rc.restore();
+        return zxingDecode(rotCanvas);
+    };
+
+    const loop = async () => {
+        while (running) {
+            try {
+                if (native) {
+                    const found = await native.detect(video);
+                    if (found && found.length) { onCode(found[0].rawValue); return; }
+                } else {
+                    const text = scanFrame();
+                    if (text) { onCode(text); return; }
+                }
+            } catch (e) { /* keep scanning */ }
+            await new Promise(r => setTimeout(r, native ? 120 : 60));
+        }
+    };
+
+    const setupTrackControls = () => {
+        const track = stream && stream.getVideoTracks()[0];
+        if (!track || !track.getCapabilities) return;
+        let caps = {};
+        try { caps = track.getCapabilities() || {}; } catch (e) { return; }
+
+        // Stock rooms are dim and these labels sit on brown cardboard.
+        const torchBtn = document.getElementById('pc-torch');
+        if (caps.torch && torchBtn) {
+            torchBtn.style.display = 'inline-block';
+            let on = false;
+            torchBtn.onclick = () => {
+                on = !on;
+                track.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+                torchBtn.classList.toggle('btn-warning', on);
+            };
+        }
+        const zoomWrap = document.getElementById('pc-zoom-wrap');
+        const zoom = document.getElementById('pc-zoom');
+        if (caps.zoom && zoomWrap && zoom) {
+            zoomWrap.style.display = 'flex';
+            zoom.min = caps.zoom.min; zoom.max = caps.zoom.max;
+            zoom.step = caps.zoom.step || 0.1;
+            zoom.value = (track.getSettings() || {}).zoom || caps.zoom.min;
+            zoom.oninput = () => track.applyConstraints(
+                { advanced: [{ zoom: Number(zoom.value) }] }).catch(() => {});
+        }
+        if (caps.focusMode && caps.focusMode.includes('continuous')) {
+            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+        }
+    };
+
+    const start = async () => {
+        say('');
+        // getUserMedia is blocked on plain http, so say so rather than
+        // appearing to do nothing.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            say('The camera needs a secure (https) connection. Type the code instead.');
+            return;
+        }
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' },
+                         width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+        } catch (e) {
+            say('Could not open the camera. Type the code instead.');
+            return;
+        }
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+        native = await initNative();
+        setupTrackControls();
+        scanner.style.display = 'block';
+        startBtn.style.display = 'none';
+        running = true;
+        loop();
+    };
+
+    const stop = () => {
+        running = false;
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        video.srcObject = null;
+        scanner.style.display = 'none';
+        startBtn.style.display = 'block';
+    };
+
+    startBtn.onclick = start;
+    stopBtn.onclick = stop;
+    document.getElementById('pc-search').onclick = () => lookup(input.value.trim());
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); lookup(input.value.trim()); }
+    });
+
+    // Deep link: /product_check?code=LX00153
+    const preset = new URLSearchParams(window.location.search).get('code');
+    if (preset) { input.value = preset; lookup(preset); }
+});
+</script>
+{% endblock %}

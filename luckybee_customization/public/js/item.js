@@ -17,6 +17,7 @@ frappe.ui.form.on('Item', {
         render_amazon_freshness(frm);
         add_refresh_amazon_button(frm);
         add_label_buttons(frm);
+        add_product_builder_buttons(frm);
         if(frm.doc.custom_category){
             set_filter_in_subcat_on_the_basis_of_cat(frm)
         }
@@ -588,4 +589,113 @@ function add_label_buttons(frm) {
             });
         }
     }, __('Label'));
+}
+
+// Phase 2 section 3 - Product Builder actions.
+// Only shown once there is actually a reference to pull from, so the group does
+// not sit there empty on the ~8,000 items that already have an ASIN and never
+// need the builder at all.
+function add_product_builder_buttons(frm) {
+    if (frm.is_new()) return;
+
+    const hasAsinRef = !!frm.doc.pb_reference_asin;
+    const hasFlipkartRef = !!frm.doc.pb_reference_flipkart_url;
+    if (!hasAsinRef && !hasFlipkartRef) {
+        // Readiness is still worth checking on a half-built product.
+        if (frm.doc.pb_publish_status === 'Draft') add_readiness_button(frm);
+        return;
+    }
+
+    if (hasAsinRef) {
+        frm.add_custom_button(__('Pull from Reference ASIN'), function () {
+            if (!frm.doc.pb_reference_relationship) {
+                frappe.msgprint({
+                    title: __('Relationship needed'),
+                    message: __('Choose how the reference relates to this product first - it decides what may be copied.'),
+                    indicator: 'orange',
+                });
+                return;
+            }
+            // Show what will and will not be copied BEFORE touching the record.
+            // Borrowed data that arrives silently is exactly how approximate
+            // data ends up published as though it were exact.
+            frappe.call({
+                method: 'luckybee_customization.api.product_builder.get_sync_plan',
+                args: { relationship: frm.doc.pb_reference_relationship },
+                callback: function (r) {
+                    const plan = r.message || {};
+                    frappe.confirm(
+                        `<div style="font-size:12px;">
+                            <div><b>${__('Will copy')}:</b> ${(plan.fields || []).join(', ') || '-'}</div>
+                            <div style="margin-top:6px;"><b>${__('Will NOT copy')}:</b> ${(plan.excluded || []).join(', ') || __('nothing')}</div>
+                            <div class="text-muted" style="margin-top:6px;">${frappe.utils.escape_html(plan.note || '')}</div>
+                         </div>`,
+                        () => runBuilderSync(frm, 'sync_from_reference', { relationship: frm.doc.pb_reference_relationship })
+                    );
+                },
+            });
+        }, __('Product Builder'));
+    }
+
+    if (hasFlipkartRef) {
+        frm.add_custom_button(__('Pull from Flipkart'), function () {
+            runBuilderSync(frm, 'sync_from_flipkart', {});
+        }, __('Product Builder'));
+    }
+
+    add_readiness_button(frm);
+}
+
+function add_readiness_button(frm) {
+    frm.add_custom_button(__('Check Publish Readiness'), function () {
+        frappe.call({
+            method: 'luckybee_customization.api.product_builder.check_publish_readiness',
+            args: { item_code: frm.doc.name },
+            callback: function (r) {
+                const res = r.message || {};
+                if (res.ready) {
+                    frappe.msgprint({
+                        title: __('Ready to publish'),
+                        message: __('The essentials are present and confirmed.'),
+                        indicator: 'green',
+                    });
+                } else {
+                    frappe.msgprint({
+                        title: __('Not ready yet'),
+                        message: '<ul style="margin:0; padding-left:18px;">'
+                            + (res.blockers || []).map(b => `<li>${frappe.utils.escape_html(b)}</li>`).join('')
+                            + '</ul>',
+                        indicator: 'orange',
+                    });
+                }
+            },
+        });
+    }, __('Product Builder'));
+}
+
+function runBuilderSync(frm, method, extraArgs) {
+    frappe.dom.freeze(__('Pulling reference data...'));
+    frappe.call({
+        method: 'luckybee_customization.api.product_builder.' + method,
+        args: Object.assign({ item_code: frm.doc.name }, extraArgs || {}),
+        callback: function (r) {
+            frappe.dom.unfreeze();
+            const res = r.message || {};
+            if (res.status !== 'ok') {
+                frappe.msgprint({
+                    title: __('Nothing pulled'),
+                    message: res.message || __('Could not pull reference data.'),
+                    indicator: 'orange',
+                });
+                return;
+            }
+            frappe.show_alert({
+                message: __('Updated {0} field(s) - marked {1}', [
+                    (res.applied || []).length, res.confidence || 'Approximate']),
+                indicator: 'green',
+            });
+            frm.reload_doc();
+        },
+        error: function () { frappe.dom.unfreeze(); },
+    });
 }

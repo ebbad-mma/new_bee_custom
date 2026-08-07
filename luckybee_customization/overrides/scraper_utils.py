@@ -1,195 +1,264 @@
+"""Flipkart product scraping (Phase 2 section 1).
+
+Repaired, not rewritten from scratch: the previous build keyed every field on
+Flipkart's obfuscated CSS class names (VU-ZEz, Nx9bqj CxhGGd, r2CdBx, XQDdHH,
+yeLeBC). Those are build artefacts that change on every Flipkart deploy, and
+diagnosis showed all five matching zero elements while the page itself came
+back fine - HTTP 200, 1.7MB, the real product - so the scraper was silently
+returning empties rather than being blocked.
+
+Swapping in today's class names would have worked until the next deploy and
+then failed identically. This reads Flipkart's schema.org ld+json block
+instead: a published contract carrying name, brand, price, rating, rating
+count, images, description, category and sku. Structural fallbacks cover what
+ld+json does not expose (MRP, discount, spec tables), and every one of them is
+optional - a missing spec table must never cost us the title and price.
+"""
+
+import json
+import re
+
 import frappe
 import requests
 from bs4 import BeautifulSoup as bs
-import re
+
+# Flipkart serves the same markup either way (verified), but identifying
+# ourselves honestly is the polite default and costs nothing.
+_HEADERS = {
+	"User-Agent": (
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+		"(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+	),
+	"Accept-Language": "en-IN,en;q=0.9",
+}
+
+_TIMEOUT = 25
+
+
 def extract_discount(discount_text):
-	# Extract the numeric part of the discount
-	discount_percentage = re.search(r'\d+', discount_text)
-	if discount_percentage:
-		return discount_percentage.group()
-	return None
+	"""Numeric part of a discount string, e.g. "66% off" -> "66"."""
+	if not discount_text:
+		return None
+	discount_percentage = re.search(r"\d+", str(discount_text))
+	return discount_percentage.group() if discount_percentage else None
+
+
+def extract_pid_with_regex(url):
+	"""FSN is the `pid` parameter's value.
+
+	Keyed strictly on pid=, never a pattern match, because the same URL also
+	carries lid=LSTSHOHFCB4WYHQDDY4EUH2ME - which contains the FSN as a
+	substring plus extra characters and would silently produce a wrong code.
+	"""
+	if not url:
+		return None
+	match = re.search(r"pid=([^&]+)", url)
+	return match.group(1) if match else None
+
+
+def _to_number(value):
+	"""Flipkart prices arrive as 2700, "2,700" or "₹2,700" depending on source."""
+	if value is None:
+		return 0
+	if isinstance(value, (int, float)):
+		return value
+	digits = re.sub(r"[^\d.]", "", str(value))
+	if not digits:
+		return 0
+	try:
+		return float(digits) if "." in digits else int(digits)
+	except ValueError:
+		return 0
+
+
+def _product_ld_json(soup):
+	"""The schema.org Product node, or {} if the page has none."""
+	for block in soup.find_all("script", type="application/ld+json"):
+		try:
+			payload = json.loads(block.string or block.get_text())
+		except Exception:
+			continue
+		for node in (payload if isinstance(payload, list) else [payload]):
+			if isinstance(node, dict) and node.get("@type") == "Product":
+				return node
+	return {}
+
+
+def _breadcrumbs(soup):
+	"""Category trail from the BreadcrumbList node - Flipkart's own hierarchy."""
+	for block in soup.find_all("script", type="application/ld+json"):
+		try:
+			payload = json.loads(block.string or block.get_text())
+		except Exception:
+			continue
+		for node in (payload if isinstance(payload, list) else [payload]):
+			if isinstance(node, dict) and node.get("@type") == "BreadcrumbList":
+				names = []
+				for entry in node.get("itemListElement") or []:
+					item = entry.get("item")
+					name = item.get("name") if isinstance(item, dict) else entry.get("name")
+					if name:
+						names.append(name)
+				# first crumb is "Home", last is the product itself
+				return names[1:-1] if len(names) > 2 else names
+	return []
+
+
+def _mrp_and_discount(raw_html, selling_price):
+	"""MRP and discount are not in ld+json, so read the embedded state.
+
+	Falls back to deriving the discount rather than leaving it blank when only
+	the MRP is found.
+	"""
+	mrp = 0
+	match = re.search(r'"mrp"\s*:\s*(\d+)', raw_html)
+	if match:
+		mrp = _to_number(match.group(1))
+
+	discount = None
+	match = re.search(r'"discount"\s*:\s*"?(\d+)', raw_html)
+	if match:
+		discount = match.group(1)
+	elif mrp and selling_price and mrp > selling_price:
+		discount = str(int(round((mrp - selling_price) / mrp * 100)))
+
+	return mrp, discount
+
+
+def _specifications(soup):
+	"""Best-effort spec tables, keyed on structure rather than class names.
+
+	Flipkart lays specs out as a heading followed by rows of label/value pairs.
+	Returns {} when nothing is recognisable - callers treat specs as optional,
+	and a missing spec table must never cost us the title and price.
+	"""
+	specs = {}
+	try:
+		for table in soup.find_all("table"):
+			# The group heading is usually the nearest preceding heading-ish node.
+			heading = table.find_previous(["h2", "h3", "div"])
+			group = (heading.get_text(strip=True)[:40] if heading else "General") or "General"
+			rows = {}
+			for tr in table.find_all("tr"):
+				cells = tr.find_all(["td", "th"])
+				if len(cells) >= 2:
+					key = cells[0].get_text(strip=True)
+					val = cells[1].get_text(" ", strip=True)
+					if key:
+						rows[key] = val
+			if rows:
+				specs.setdefault(group, {}).update(rows)
+	except Exception:
+		return {}
+	return specs
 
 
 def scrape(fsn):
+	"""Return the Flipkart data block for an FSN.
+
+	Every key the caller indexes is always present, with a usable empty value,
+	so a partial page can never raise a KeyError mid-save and block a staff
+	member from saving the item.
+	"""
+	data = {
+		"title": "",
+		"price": 0,
+		"mrp": 0,
+		"categories": [],
+		"rating": 0,
+		"ratings": "",
+		"reviews": "",
+		"discount": None,
+		"seller": "",
+		"seller_rating": "",
+		"image_url": "",
+		"multiple_images": [],
+		"specifications": {},
+		"product_details": {},
+		"general": "",
+		"highlights": [],
+		"description": "",
+		"availability": "",
+		"brand": "",
+	}
+
+	if not fsn:
+		return data
+
 	url = f"https://www.flipkart.com/product/p/itme?pid={fsn}"
-
-	page = requests.get(url)
-	soup = bs(page.content, 'html.parser')
-
-	# Initialize data dictionary
-	data = {}
-
-	# Scrape the title
 	try:
-		title = soup.find('span', class_='VU-ZEz').text
-		frappe.log_error("Title", title)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping title: {str(e)}", "Flipkart Scraper Error")
-		title = ""
-	data["title"] = title
+		page = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT)
+		page.raise_for_status()
+	except Exception as e:
+		# Network problems must not block the save - the item still needs its
+		# photos and counts recording.
+		frappe.log_error(f"Flipkart fetch failed for {fsn}: {e}", "Flipkart Scraper")
+		return data
 
-	# Scrape the price
-	try:
-		price = soup.find('div', class_='Nx9bqj CxhGGd').text
-		frappe.log_error("Price", price)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping price: {str(e)}", "Flipkart Scraper Error")
-		price = 0
-	data["price"] = price
+	soup = bs(page.content, "html.parser")
+	product = _product_ld_json(soup)
 
-	# Scrape categories
-	try:
-		categories = [div.text for div in soup.find_all('div', class_='r2CdBx')[1:-1]]
-		frappe.log_error("Categories", categories)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping categories: {str(e)}", "Flipkart Scraper Error")
-		categories = []
-	data["categories"] = categories
+	if not product:
+		frappe.log_error(
+			f"No schema.org Product block for FSN {fsn} - Flipkart markup may have "
+			f"changed again, or the FSN is wrong.",
+			"Flipkart Scraper",
+		)
+		return data
 
-    # Scrape the rating
-	try:
-		rating = soup.find('div', class_='XQDdHH').text
-		frappe.log_error("Rating", rating)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping rating: {str(e)}", "Flipkart Scraper Error")
-		rating = ""
-	data["rating"] = rating
+	data["title"] = product.get("name") or ""
+	data["description"] = product.get("description") or ""
 
-	# Scrape the seller information
-	try:
-		seller = soup.find('div', class_='yeLeBC').text
-		frappe.log_error("Seller", seller)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping seller: {str(e)}", "Flipkart Scraper Error")
-		seller = ""
-	data["seller"] = seller
+	brand = product.get("brand")
+	data["brand"] = brand.get("name") if isinstance(brand, dict) else (brand or "")
 
-	# Scrape the seller rating
-	try:
-		seller_rating = soup.find('div', class_='XQDdHH uuhqql').text
-		frappe.log_error("Seller Rating", seller_rating)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping seller rating: {str(e)}", "Flipkart Scraper Error")
-		seller_rating = ""
-	data["seller_rating"] = seller_rating
+	offers = product.get("offers") or {}
+	if isinstance(offers, list):
+		offers = offers[0] if offers else {}
+	data["price"] = _to_number(offers.get("price"))
+	data["availability"] = (offers.get("availability") or "").rsplit("/", 1)[-1]
 
-	# Scrape the main image
-	try:
-		main_image_div = soup.find('div', class_='_4WELSP _6lpKCl')
-		if not main_image_div:
-			main_image_div = soup.find('div', class_='gqcSqV YGE0gZ')
-		main_image = main_image_div.img['src'] if main_image_div else ""
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping main image: {str(e)}", "Flipkart Scraper Error")
-		main_image = ""
-	data["image_url"] = main_image
+	rating = product.get("aggregateRating") or {}
+	data["rating"] = _to_number(rating.get("ratingValue"))
+	data["ratings"] = str(rating.get("ratingCount") or "")
+	data["reviews"] = str(rating.get("reviewCount") or rating.get("ratingCount") or "")
 
-	# Scrape multiple images
-	try:
-		image_src = [img.img['src'] for img in soup.find_all('div', class_='Pz+aTd')]
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping multiple images: {str(e)}", "Flipkart Scraper Error")
-		image_src = []
-	data["multiple_images"] = image_src
+	images = product.get("image")
+	if isinstance(images, list):
+		data["multiple_images"] = [i for i in images if i]
+	elif images:
+		data["multiple_images"] = [images]
+	data["image_url"] = data["multiple_images"][0] if data["multiple_images"] else ""
 
-	# Scrape specifications
-	try:
-		specs_dict = {}
-		specs = soup.find_all('div', class_='GNDEQ-')
-		# General specifications as modified HTML
-		data["general"] = str(specs)
-		for spec in specs:
-			spec_title = spec.find('div', class_='_4BJ2V+').text
-			specs_dict[spec_title] = {}
-			table = spec.find('table')
-			for row in table.find_all('tr'):
-				columns = row.find_all('td')
-				if len(columns) == 2:
-					col1 = columns[0].text.strip()
-					col2 = columns[1].text.strip()
-					specs_dict[spec_title][col1] = col2
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping specifications: {str(e)}", "Flipkart Scraper Error")
-		specs_dict = {}
-	data["specifications"] = specs_dict
+	data["categories"] = _breadcrumbs(soup) or (
+		[product["category"]] if product.get("category") else []
+	)
 
-	 # Scrape product details
-	try:
-		product_details_dict = {}
-		main_div = soup.find('div', class_='sBVJqn')
-		if main_div:
-			for row_div in main_div.find_all('div', class_='row'):
-				columns = row_div.find_all('div')
-				if len(columns) == 2:
-					column1_data = columns[0].text.strip()
-					column2_data = columns[1].text.strip()
-					product_details_dict[column1_data] = column2_data
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping product details: {str(e)}", "Flipkart Scraper Error")
-		product_details_dict = {}
-	data["product_details"] = product_details_dict
+	data["mrp"], data["discount"] = _mrp_and_discount(page.text, data["price"])
 
-	# Scrape ratings and reviews
-	# try:
-	# 	ratings_reviews = soup.find('span', class_='Wphh3N')
-	# 	ratings_reviews_text = ratings_reviews.text if ratings_reviews else ""
-	# 	li=ratings_reviews_text.split(" ")
-	# 	if "&" in li:
-	# 		li = li.replace("&", " ")
-	# 	frappe.throw(f"{li}")
-	# 	ratings, reviews = "0 Ratings", "0 Reviews"
-	# 	frappe.throw(f"{li}")
-	# 	if ratings_reviews_text:
-	# 		ratings =li[0]
-	# 		reviews = li[3]
-	# 		frappe.throw(f"{reviews}")
-	# except AttributeError as e:
-	# 	frappe.log_error(f"Error scraping ratings and reviews: {str(e)}", "Flipkart Scraper Error")
-	ratings, reviews = "0 Ratings", "0 Reviews"
-	data["ratings"] =ratings
-	data["reviews"] = reviews
-
-	# Scrape discount
-	try:
-		discount_div = soup.find('div', class_='UkUFwK WW8yVX')
-		discount = discount_div.find('span').text.strip() if discount_div else None
-		discount = extract_discount(str(discount))
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping discount: {str(e)}", "Flipkart Scraper Error")
-		discount = None
-	data["discount"] = discount
-
-	
-
-	# Scrape highlights
-	try:
-		data["highlights"] = []
-		highlights = soup.find('div', class_='xFVion')
-		if highlights!=None:
-			for item in highlights:
-				for i in item:
-					data["highlights"].append(i.text)
-	except AttributeError as e:
-		frappe.log_error(f"Error scraping highlights: {str(e)}", "Flipkart Scraper Error")
-		data["highlights"] = []
-
-	# Description placeholder
-	data["description"] = ""
+	specs = _specifications(soup)
+	data["specifications"] = specs
+	data["general"] = str(specs) if specs else ""
 
 	return data
 
 
-
-
-
 def set_images(doc, image_list):
-	if image_list:
-		doc.lb_primary_image = image_list[0]
+	"""Record scraped images WITHOUT publishing them.
 
-def extract_pid_with_regex(url):
-	pattern = r'pid=([^&]+)'
-	match = re.search(pattern, url)
-	if match:
-		return match.group(1)
-	else:
-		return None
+	Phase 2 section 3.5 is explicit: images from Flipkart, a brand site or a
+	catalogue are copyrighted and may not even match the returns-lot item we
+	actually hold, so they are reference only and must never become the live
+	product image. lb_primary_image is the publishable one, so this
+	deliberately no longer writes to it - it fills the reference field and
+	flags the item as still needing its own photograph.
+	"""
+	if not image_list:
+		return
+
+	meta = doc.meta
+	if meta.has_field("pb_reference_photos") and not doc.get("pb_reference_photos"):
+		doc.pb_reference_photos = image_list[0]
+
+	if meta.has_field("pb_needs_own_photos") and not doc.get("lb_primary_image"):
+		doc.pb_needs_own_photos = 1

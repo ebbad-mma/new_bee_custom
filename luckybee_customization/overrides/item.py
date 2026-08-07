@@ -939,7 +939,13 @@ def _sync_keepa_item_internal(doc, event):
 		item_detail.length_breadth = dims.get('Width', "")
 		item_detail.length_height = dims.get('Height', "")
 
-		doc.custom_mrp = data['price']
+		# custom_mrp is the printed MRP, and it drives the SAVE line on the
+		# product label - so it must be Flipkart's struck-through MRP, not what
+		# they are currently selling at. Previously this took data['price'],
+		# which on the test product meant storing 2700 as the "MRP" when the
+		# real MRP was 7999, wiping the saving out of the label entirely.
+		# Falls back to the selling price only when no MRP is published.
+		doc.custom_mrp = data.get('mrp') or data['price']
 		item_detail.title_flipkart = data['title']
 		item_detail.flipkart_rating = data['rating']
 		reviews=data['reviews'].split(" ")[0]
