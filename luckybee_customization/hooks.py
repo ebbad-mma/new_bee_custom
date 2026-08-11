@@ -267,6 +267,9 @@ doc_events = {
 		"on_update": "luckybee_customization.overrides.bin.enqueue_create_item_price"
         },
         "Sales Invoice": {
+		# 5.3 - on validate, not on_submit: the cashier should be stopped while
+		# the bill is still open and fixable, not as they take payment.
+		"validate": "luckybee_customization.api.pos_attribution.require_salesperson",
 		"on_submit": "luckybee_customization.overrides.sales_invoice.update_stock_in_hand_in_item_master_on_si_submit"
         },
         "Purchase Order": {

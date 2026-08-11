@@ -87,6 +87,118 @@ def _mark(doc, source, confidence):
 		doc.pb_publish_status = "Draft"
 
 
+def _cm(value):
+	"""Keepa reports dimensions in millimetres; the rest of the app stores cm."""
+	try:
+		return str(round(float(value) / 10.0, 2)) if value and float(value) > 0 else None
+	except (TypeError, ValueError):
+		return None
+
+
+def _reference_payload(asin):
+	"""Pull the reference ASIN from Keepa and sort it into the buckets that
+	section 3.3 reasons about.
+
+	This queries Keepa directly rather than going through the ordinary item
+	sync, because that one writes an Item Details row keyed by the ASIN and
+	mirrors it onto the Item. Doing that here would file another product's
+	record against our item and mark it Amazon-matched, which is precisely the
+	confusion the relationship rules exist to prevent.
+
+	Returns {bucket: {fieldname: value}}, plus "images" as a list of URLs.
+	"""
+	accesskey = frappe.conf.get("keepa_api_key")
+	if not accesskey:
+		return None, _("No Keepa API key is configured.")
+
+	try:
+		import keepa
+		api = keepa.Keepa(accesskey, timeout=60.0)
+		products = api.query([asin], stats=30, rating=True, update=0,
+							 domain="IN", history=0)
+	except Exception as e:
+		return None, _("Keepa lookup failed: {0}").format(str(e)[:150])
+
+	if not products or not isinstance(products[0], dict):
+		return None, _("Keepa returned no product for {0}.").format(asin)
+
+	prod = products[0]
+	buckets = {}
+
+	tree = [c.get("name") for c in (prod.get("categoryTree") or [])
+			if isinstance(c, dict) and c.get("name")]
+	if tree:
+		buckets["category"] = {"categories_tree": ", ".join(tree)}
+		buckets["sub_category"] = {"category_sub": tree[-1]}
+
+	if prod.get("description"):
+		buckets["description"] = {"desc_feature": prod["description"]}
+
+	features = [f for f in (prod.get("features") or []) if f]
+	if features:
+		buckets["features"] = {
+			f"desc_feature_{i + 1}": features[i] for i in range(min(5, len(features)))
+		}
+
+	specs = {}
+	for key, field in (("manufacturer", "manufacturer"), ("model", "model"),
+					   ("size", "size"), ("color", "color"),
+					   ("productGroup", "product_group"),
+					   ("numberOfItems", "number_of_items")):
+		if prod.get(key):
+			specs[field] = prod[key]
+	if specs:
+		buckets["specs"] = specs
+
+	dims = {}
+	for key, field in (("packageLength", "package_length"), ("packageWidth", "package_width"),
+					   ("packageHeight", "package_height"), ("itemLength", "length_length"),
+					   ("itemWidth", "length_breadth"), ("itemHeight", "length_height")):
+		value = _cm(prod.get(key))
+		if value:
+			dims[field] = value
+	for key, field in (("packageWeight", "package_weight"), ("itemWeight", "length_weight")):
+		if prod.get(key):
+			dims[field] = prod[key]
+	if dims:
+		buckets["dimensions"] = dims
+
+	if prod.get("brand"):
+		buckets["brand"] = {"brand": prod["brand"]}
+
+	if prod.get("productGroup"):
+		buckets["type"] = {"product_group": prod["productGroup"]}
+
+	# Keywords are assembled here rather than via build_search_keywords, which
+	# expects a saved Item Details row we deliberately do not create.
+	keywords = [w for w in [prod.get("brand"), prod.get("model"),
+							prod.get("size"), prod.get("color")] + tree[-3:] if w]
+	if keywords:
+		buckets["keywords"] = {"amz_search_keywords": ", ".join(dict.fromkeys(keywords))}
+
+	from luckybee_customization.overrides.item import resolve_reviews
+	rating, review_count = resolve_reviews(prod, prod.get("stats_parsed"))
+	reviews = {}
+	if rating is not None:
+		reviews["reviews_rating"] = str(rating)
+	if review_count is not None:
+		reviews["reviews_count"] = review_count
+	if reviews:
+		buckets["reviews"] = reviews
+
+	stats = prod.get("stats_parsed") or {}
+	current = stats.get("current") or {}
+	list_price = current.get("LISTPRICE") or current.get("NEW")
+	if list_price and list_price > 0:
+		buckets["price"] = {"custom_mrp": list_price}
+
+	from luckybee_customization.overrides.item import extract_image_names
+	names = extract_image_names(prod)
+	images = ["https://images-na.ssl-images-amazon.com/images/I/" + n for n in names]
+
+	return {"buckets": buckets, "images": images, "title": prod.get("title") or ""}, None
+
+
 @frappe.whitelist()
 def sync_from_reference(item_code, relationship=None):
 	"""Pull comparable data from the reference ASIN, filtered by relationship.
@@ -113,33 +225,40 @@ def sync_from_reference(item_code, relationship=None):
 
 	allowed = set(rule["fields"])
 
-	from luckybee_customization.api.mobile_forms import fetch_keepa_preview
+	payload, error = _reference_payload(asin)
+	if error:
+		return {"status": "error", "message": error}
 
-	# Reuses the existing Keepa path rather than adding a second way of talking
-	# to them; it already degrades gracefully when Keepa is slow or out of
-	# tokens, which must not block the builder.
-	preview = fetch_keepa_preview(asin) or {}
+	applied, withheld, skipped = [], [], []
 
-	applied, withheld = [], []
-
-	def maybe(field_key, fieldname, value):
-		if not value:
-			return
-		if field_key not in allowed:
-			withheld.append(field_key)
-			return
-		if doc.meta.has_field(fieldname):
+	for bucket, values in (payload["buckets"] or {}).items():
+		if bucket not in allowed:
+			withheld.append(bucket)
+			continue
+		for fieldname, value in values.items():
+			if value in (None, ""):
+				continue
+			if not doc.meta.has_field(fieldname):
+				# The bucket is permitted but this Item has no such field.
+				# Recorded rather than silently dropped, so a missing field
+				# reads as a gap in the schema and not as a rule withholding it.
+				skipped.append(fieldname)
+				continue
 			doc.set(fieldname, value)
 			applied.append(fieldname)
 
-	# Only what a preview call can actually supply. The heavier pulls (specs,
-	# dimensions, features) come from the full sync once an ASIN is set for
-	# real, and are governed by the same `allowed` set.
-	maybe("description", "description", preview.get("title"))
-	maybe("price", "custom_mrp", preview.get("price"))
+	# Section 3.5 - reference photographs are filed as reference and never
+	# published, whatever the relationship allows.
+	if payload["images"]:
+		if "images" in allowed:
+			from luckybee_customization.overrides.scraper_utils import set_images
+			set_images(doc, payload["images"])
+			applied.append("pb_reference_photos")
+		else:
+			withheld.append("images")
 
-	# An exact match is the real product, so it may simply take the ASIN and
-	# use the ordinary Keepa sync from then on.
+	# An exact match is the real product, so it may take the ASIN and use the
+	# ordinary Keepa sync from then on.
 	if relationship == "Exact match" and doc.meta.has_field("custom_asin_no") and not doc.get("custom_asin_no"):
 		doc.custom_asin_no = asin
 		applied.append("custom_asin_no")
@@ -153,8 +272,10 @@ def sync_from_reference(item_code, relationship=None):
 	return {
 		"status": "ok",
 		"relationship": relationship,
-		"applied": applied,
+		"reference_title": payload["title"],
+		"applied": sorted(set(applied)),
 		"withheld": sorted(set(withheld)),
+		"no_such_field": sorted(set(skipped)),
 		"confidence": confidence,
 		"note": rule["note"],
 	}

@@ -696,6 +696,18 @@ function runBuilderSync(frm, method, extraArgs) {
             });
             frm.reload_doc();
         },
-        error: function () { frappe.dom.unfreeze(); },
+        // A server-side failure used to unfreeze and say nothing, so a real
+        // error was indistinguishable from a dead button - which is exactly how
+        // it was reported. Say something, always.
+        error: function (r) {
+            frappe.dom.unfreeze();
+            const detail = (r && (r._server_messages || r.exc_type)) || '';
+            frappe.msgprint({
+                title: __('Pull failed'),
+                message: __('The reference data could not be pulled.')
+                    + (detail ? '<br><small>' + frappe.utils.escape_html(String(detail).slice(0, 200)) + '</small>' : ''),
+                indicator: 'red',
+            });
+        },
     });
 }

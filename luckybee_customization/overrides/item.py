@@ -2,6 +2,9 @@ import json
 import datetime
 import keepa
 import frappe
+from luckybee_customization.overrides.item_details import (
+	clear_dangling_item_link,
+)
 from frappe import _
 import re
 from frappe.utils import today
@@ -471,6 +474,7 @@ def _sync_keepa_item_internal(doc, event):
 				item_det.save(ignore_permissions=True)
 			if frappe.db.exists('Item Details', {'asin_no': doc.custom_asin_no}):
 				item_detail = frappe.get_doc('Item Details', {'asin_no': doc.custom_asin_no})
+				clear_dangling_item_link(item_detail)
 			try:
 				products = api.query(ASIN, stats=30, rating=True, update=0, domain="IN", history=1, offers=20)
 			except Exception as e:
@@ -686,6 +690,7 @@ def _sync_keepa_item_internal(doc, event):
 					item_det.save(ignore_permissions=True)
 			if frappe.db.exists('Item Details', {'ean': doc.ean}):
 				item_detail = frappe.get_doc('Item Details', {'ean': doc.ean})
+				clear_dangling_item_link(item_detail)
 			try:
 				products = api.query(EAN, stats=30, rating=True, update=0, domain="IN", history=1, product_code_is_asin=False, offers=20)
 			except Exception as e:
@@ -892,6 +897,7 @@ def _sync_keepa_item_internal(doc, event):
 				item_det.save()
 			if frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
 				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.get('custom_fsn_no')})
+				clear_dangling_item_link(item_detail)
 		if doc.get("custom_fsn_no"):
 			if not frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
 				item_det = frappe.new_doc('Item Details')
@@ -900,6 +906,7 @@ def _sync_keepa_item_internal(doc, event):
 				item_det.save(ignore_permissions=True)
 			if frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
 				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.get('custom_fsn_no')})
+				clear_dangling_item_link(item_detail)
 
 		category_names = frappe.db.get_list("Item Category", fields=['category_name'], pluck='category_name')
 
