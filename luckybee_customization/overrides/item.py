@@ -916,9 +916,24 @@ def _sync_keepa_item_internal(doc, event):
 			fsn = doc.get('custom_fsn_no')
 
 		doc.custom_fsn_no = fsn
-		frappe.log_error("FSN",fsn)
 		data = scrape(fsn)
-		frappe.log_error("FSN DATA",data)
+
+		# A blocked or failed fetch returns every key empty, and the block below
+		# writes all of them back unconditionally - which blanks the item's name,
+		# description and image, and resets custom_mrp to 0. That last one is
+		# quietly destructive: MRP drives the SAVE line on the printed label.
+		#
+		# Flipkart answers datacenter IPs with a bot-check page rather than an
+		# error, so this is the normal case on a hosted site, not an edge case.
+		# Leave the item exactly as it was and record why.
+		if not data.get("title"):
+			frappe.log_error(
+				f"Flipkart returned no product data for FSN {fsn}. "
+				f"The item was left unchanged. This is usually the host's IP "
+				f"being served a bot-check page rather than the product.",
+				"Flipkart Scraper",
+			)
+			return
 
 		doc.item_name = data['title'][0:130]
 		doc.description = data['description']
