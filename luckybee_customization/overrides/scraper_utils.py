@@ -48,7 +48,25 @@ _HEADERS = {
 	"Connection": "keep-alive",
 }
 
-_TIMEOUT = 25
+# Flipkart answers a reachable caller in well under a second, so a long timeout
+# only ever punishes the failure case - and on a host Flipkart drops packets
+# from, every save sat frozen for the full 25 seconds before giving up.
+_TIMEOUT = 8
+
+
+def _proxies():
+	"""Optional outbound proxy, for hosts Flipkart refuses to answer.
+
+	Flipkart drops traffic from datacenter ranges silently - the connection
+	times out rather than being refused - so a server that works everywhere
+	else still cannot fetch a product page. Routing just this request through a
+	proxy is the only fix available in code; everything else is a hosting
+	decision.
+
+	Unset means direct, which is what a machine Flipkart already serves wants.
+	"""
+	proxy = frappe.conf.get("flipkart_proxy")
+	return {"http": proxy, "https": proxy} if proxy else None
 
 
 def extract_discount(discount_text):
@@ -203,7 +221,8 @@ def scrape(fsn):
 
 	url = f"https://www.flipkart.com/product/p/itme?pid={fsn}"
 	try:
-		page = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT)
+		page = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT,
+							proxies=_proxies())
 		page.raise_for_status()
 	except Exception as e:
 		# Network problems must not block the save - the item still needs its
