@@ -927,10 +927,18 @@ def _sync_keepa_item_internal(doc, event):
 		# error, so this is the normal case on a hosted site, not an edge case.
 		# Leave the item exactly as it was and record why.
 		if not data.get("title"):
+			# The Item Details row was created above, so link it even though it
+			# is empty: the "Item Extra Details" button only renders when this
+			# field is set, and without it staff cannot open the record to fill
+			# anything in by hand.
+			if item_detail and not doc.get("custom_item_detail"):
+				doc.custom_item_detail = item_detail.name
+
 			frappe.log_error(
 				f"Flipkart returned no product data for FSN {fsn}. "
-				f"The item was left unchanged. This is usually the host's IP "
-				f"being served a bot-check page rather than the product.",
+				f"The item was left unchanged. Check whether this host can "
+				f"reach flipkart.com at all - see "
+				f"luckybee_customization.api.net_check.check_outbound.",
 				"Flipkart Scraper",
 			)
 			return
