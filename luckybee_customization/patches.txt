@@ -23,3 +23,4 @@ luckybee_customization.patches.set_system_currency_inr
 luckybee_customization.patches.product_catalogue_item_link
 luckybee_customization.patches.product_builder_fields
 luckybee_customization.patches.pos_salesperson_fields
+luckybee_customization.patches.ensure_flipkart_fields
