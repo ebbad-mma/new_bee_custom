@@ -24,12 +24,28 @@ from bs4 import BeautifulSoup as bs
 
 # Flipkart serves the same markup either way (verified), but identifying
 # ourselves honestly is the polite default and costs nothing.
+# A User-Agent alone is a weak disguise: a real browser sends a dozen more
+# headers, and their absence is one of the cheapest bot signals to key on.
+# Flipkart serves datacenter IPs a bot-check page rather than an error, so this
+# is worth getting right before concluding the address itself is blocked.
 _HEADERS = {
 	"User-Agent": (
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-		"(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+		"(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 	),
-	"Accept-Language": "en-IN,en;q=0.9",
+	"Accept": (
+		"text/html,application/xhtml+xml,application/xml;q=0.9,"
+		"image/avif,image/webp,image/apng,*/*;q=0.8"
+	),
+	"Accept-Language": "en-IN,en-GB;q=0.9,en;q=0.8",
+	"Accept-Encoding": "gzip, deflate, br",
+	"Upgrade-Insecure-Requests": "1",
+	"Sec-Fetch-Dest": "document",
+	"Sec-Fetch-Mode": "navigate",
+	"Sec-Fetch-Site": "none",
+	"Sec-Fetch-User": "?1",
+	"Cache-Control": "max-age=0",
+	"Connection": "keep-alive",
 }
 
 _TIMEOUT = 25
@@ -199,9 +215,29 @@ def scrape(fsn):
 	product = _product_ld_json(soup)
 
 	if not product:
+		# Distinguish the two causes that look identical from the outside: a
+		# genuine markup change, versus Flipkart handing this host a bot-check
+		# page. Both arrive as HTTP 200 with no product block, so the response
+		# itself has to be described or the next person guesses too.
+		page_title = ""
+		try:
+			if soup.title and soup.title.string:
+				page_title = soup.title.string.strip()[:120]
+		except Exception:
+			pass
+		body_text = " ".join((soup.get_text(" ", strip=True) or "").split())[:300]
+
 		frappe.log_error(
-			f"No schema.org Product block for FSN {fsn} - Flipkart markup may have "
-			f"changed again, or the FSN is wrong.",
+			f"No schema.org Product block for FSN {fsn}.\n"
+			f"HTTP status: {page.status_code}\n"
+			f"Final URL:   {page.url}\n"
+			f"Bytes:       {len(page.content)}\n"
+			f"Page title:  {page_title!r}\n"
+			f"Body starts: {body_text!r}\n\n"
+			f"A real product page is typically >100KB and titled with the "
+			f"product name. A short page, a login/captcha title, or a redirect "
+			f"away from /p/ means this host is being challenged rather than "
+			f"served - which is an IP problem, not a parsing one.",
 			"Flipkart Scraper",
 		)
 		return data
