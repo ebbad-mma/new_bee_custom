@@ -53,7 +53,22 @@ ASIN_FIELD_LIMIT = 30
 
 
 def pending_items(limit):
-	"""ASIN-matched items, least recently synced first, never-synced first of all."""
+	"""ASIN-matched items, least recently *attempted* first.
+
+	Ordering on success rather than attempt was a trap. amz_last_successful_sync
+	is only written when Keepa returns a price, and 688 of these items are out
+	of stock or discontinued, so no price ever comes back for them. They stayed
+	permanently at the head of the queue: the same batch was picked every hour,
+	re-synced, and picked again - burning tokens on items that cannot succeed
+	while the genuine backlog behind them was never reached. Two consecutive
+	calls returned an identical list.
+
+	Attempt time drives the order instead, so every item rotates through whether
+	or not Keepa has anything to say about it. `modified` breaks ties because
+	amz_last_synced is a Date, not a datetime - without it every item attempted
+	today would still sort equal, and MySQL would happily hand back the same
+	rows again.
+	"""
 	return frappe.db.sql(
 		"""
 		SELECT name
@@ -61,10 +76,9 @@ def pending_items(limit):
 		WHERE IFNULL(custom_asin_no, '') != ''
 		  AND IFNULL(disabled, 0) = 0
 		  AND CHAR_LENGTH(custom_asin_no) <= %s
-		ORDER BY (amz_last_successful_sync IS NOT NULL),
-				 amz_last_successful_sync ASC,
-				 (amz_last_synced IS NOT NULL),
-				 amz_last_synced ASC
+		ORDER BY (amz_last_synced IS NOT NULL),
+				 amz_last_synced ASC,
+				 modified ASC
 		LIMIT %s
 		""",
 		(ASIN_FIELD_LIMIT, limit),

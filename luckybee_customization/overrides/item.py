@@ -179,10 +179,20 @@ def apply_amazon_image_urls(doc, images_list):
 	"""
 	if not images_list:
 		return
+
+	wanted = ["https://images-na.ssl-images-amazon.com/images/I/" + n for n in images_list]
+	existing = [r.image_url for r in (doc.get("amz_image_urls") or [])]
+
+	# Rebuilding an unchanged table produced "removed 5 rows / added 5 rows" on
+	# every hourly sync, and a document version row each time - churn that made
+	# an item's history unreadable and hid the edits that actually mattered.
+	if existing == wanted:
+		return
+
 	doc.set("amz_image_urls", [])
-	for idx, image_name in enumerate(images_list):
+	for idx, image_url in enumerate(wanted):
 		doc.append("amz_image_urls", {
-			"image_url": "https://images-na.ssl-images-amazon.com/images/I/" + image_name,
+			"image_url": image_url,
 			"sequence": idx + 1,
 		})
 	mark_system_field_modified(doc, "amz_image_urls")
