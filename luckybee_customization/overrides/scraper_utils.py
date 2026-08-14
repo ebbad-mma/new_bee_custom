@@ -69,6 +69,29 @@ def _proxies():
 	return {"http": proxy, "https": proxy} if proxy else None
 
 
+def _timeout():
+	"""How long to wait for Flipkart.
+
+	8 seconds is right for a direct connection - Flipkart answers a reachable
+	caller in well under a second, so a longer wait only punishes the failure
+	case, and on a blocked host every save sat frozen for the full timeout.
+
+	A proxy is a different story: it adds a hop, and the residential proxies
+	that Flipkart actually serves are routinely slow enough to blow through 8
+	seconds on a first request. So the default rises when one is configured -
+	otherwise turning the proxy on would swap "blocked" for "times out", which
+	looks identical from the item form. Override with flipkart_timeout in
+	site_config.json.
+	"""
+	configured = frappe.conf.get("flipkart_timeout")
+	if configured:
+		try:
+			return float(configured)
+		except (TypeError, ValueError):
+			pass
+	return 25.0 if frappe.conf.get("flipkart_proxy") else _TIMEOUT
+
+
 def extract_discount(discount_text):
 	"""Numeric part of a discount string, e.g. "66% off" -> "66"."""
 	if not discount_text:
@@ -221,7 +244,7 @@ def scrape(fsn):
 
 	url = f"https://www.flipkart.com/product/p/itme?pid={fsn}"
 	try:
-		page = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT,
+		page = requests.get(url, headers=_HEADERS, timeout=_timeout(),
 							proxies=_proxies())
 		page.raise_for_status()
 	except Exception as e:

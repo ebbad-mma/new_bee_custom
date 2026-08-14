@@ -12,6 +12,7 @@ arbitrary URL would be a server-side request forgery hole, letting any caller
 use the server to probe addresses it can reach and the caller cannot.
 """
 
+import re
 import socket
 import time
 
@@ -98,3 +99,102 @@ def check_outbound():
 
 	return {"results": results, "reachable": reachable,
 			"unreachable": blocked, "verdict": verdict}
+
+
+# A product that has been listed for years, so a failure here is the connection
+# rather than a dead listing. Nothing is written anywhere - this only fetches.
+PROBE_FSN = "PEPGDUTJDQYUWZG5"
+
+
+def _masked_proxy():
+	"""The configured proxy with its credentials hidden.
+
+	The proxy URL routinely carries user:password, and this method's output ends
+	up pasted into chats and tickets - so it must never return the secret.
+	"""
+	proxy = frappe.conf.get("flipkart_proxy")
+	if not proxy:
+		return None
+	return re.sub(r"//[^@/]+@", "//***:***@", proxy)
+
+
+@frappe.whitelist()
+def check_flipkart_fetch():
+	"""Fetch a real Flipkart product page the way the scraper does, and report.
+
+	Written for bringing an outbound proxy online: the socket check above says
+	whether the address answers, this says whether the whole request works
+	end to end - through `flipkart_proxy` when one is configured, directly when
+	not. Reports the same three failure modes the scraper distinguishes, so a
+	proxy can be proved working before anyone waits on an item save to tell them.
+	"""
+	if "System Manager" not in frappe.get_roles():
+		frappe.throw(_("Not permitted."), frappe.PermissionError)
+
+	from luckybee_customization.overrides.scraper_utils import (
+		_HEADERS,
+		_product_ld_json,
+		_proxies,
+		_timeout,
+	)
+
+	out = {
+		"proxy_configured": bool(frappe.conf.get("flipkart_proxy")),
+		"proxy": _masked_proxy(),
+		"timeout": _timeout(),
+		"fsn": PROBE_FSN,
+	}
+
+	import requests
+	from bs4 import BeautifulSoup as bs
+
+	url = f"https://www.flipkart.com/product/p/itme?pid={PROBE_FSN}"
+	started = time.time()
+	try:
+		page = requests.get(url, headers=_HEADERS, timeout=_timeout(), proxies=_proxies())
+	except Exception as e:
+		out["elapsed_ms"] = int((time.time() - started) * 1000)
+		out["ok"] = False
+		out["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+		out["verdict"] = (
+			"The request never completed. Through a proxy this is usually the "
+			"proxy itself - wrong host/port, bad credentials, or slower than the "
+			"timeout. Directly, it is the datacenter-IP block."
+			if out["proxy_configured"] else
+			"The request never completed and no proxy is configured - this is the "
+			"datacenter-IP block. Set flipkart_proxy in site_config.json."
+		)
+		return out
+
+	out["elapsed_ms"] = int((time.time() - started) * 1000)
+	out["http_status"] = page.status_code
+	out["bytes"] = len(page.content)
+
+	soup = bs(page.content, "html.parser")
+	product = _product_ld_json(soup)
+	out["product_block"] = bool(product)
+	out["title"] = (product.get("name") or "")[:120] if product else ""
+
+	if product:
+		out["ok"] = True
+		out["verdict"] = (
+			"Working. Flipkart served the full product page"
+			+ (" through the proxy." if out["proxy_configured"] else " directly.")
+		)
+	else:
+		out["ok"] = False
+		page_title = ""
+		try:
+			if soup.title and soup.title.string:
+				page_title = soup.title.string.strip()[:120]
+		except Exception:
+			pass
+		out["page_title"] = page_title
+		out["verdict"] = (
+			"Reached Flipkart but got no product data - a bot-check or captcha "
+			"page rather than the product. The connection works; this IP is being "
+			"challenged. A different proxy (residential rather than datacenter) "
+			"is what changes this."
+		)
+
+	return out
