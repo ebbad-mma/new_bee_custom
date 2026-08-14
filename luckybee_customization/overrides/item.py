@@ -471,6 +471,10 @@ def _sync_keepa_item_internal(doc, event):
 	accesskey = frappe.conf.get("keepa_api_key")
 	if not accesskey:
 		frappe.log_error("Missing Keepa API key in site_config.json")
+		# The Flipkart scrape needs no Keepa key. Returning here used to mean an
+		# item with a Flipkart URL never synced at all on a site without one.
+		if doc.get("custom_url") or doc.get("custom_fsn_no"):
+			_sync_flipkart_item(doc)
 		return
 	# The library defaults to a 10s timeout, but an offers=20 query (needed for
 	# Buy Box pricing) routinely takes 7-9s and was timing out mid-sync.
@@ -898,86 +902,128 @@ def _sync_keepa_item_internal(doc, event):
 					item_detail.save(ignore_permissions=True)
 				# frappe.msgprint(_("Item(s) has been synced with keepa"))
 	
-	elif doc.get("custom_url") or doc.get("custom_fsn_no"):
-		if doc.get("custom_url"):
-			if not frappe.db.exists('Item Details', {'url': doc.get('custom_url')}):
-				item_det = frappe.new_doc('Item Details')
-				item_det.url = doc.get('custom_url')
-				item_det.fsn_no = doc.get('custom_fsn_no')
-				item_det.save()
-			if frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
-				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.get('custom_fsn_no')})
-				clear_dangling_item_link(item_detail)
-		if doc.get("custom_fsn_no"):
-			if not frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
-				item_det = frappe.new_doc('Item Details')
-				item_det.url = doc.get('custom_url')
-				item_det.fsn_no = doc.get('custom_fsn_no')
-				item_det.save(ignore_permissions=True)
-			if frappe.db.exists('Item Details', {'fsn_no': doc.get('custom_fsn_no')}):
-				item_detail = frappe.get_doc('Item Details', {'fsn_no': doc.get('custom_fsn_no')})
-				clear_dangling_item_link(item_detail)
+	# Flipkart is an additional source, not an alternative to Keepa. This used to
+	# be the last `elif` of the chain above, so an item carrying an ASIN (or even
+	# just an EAN) never read its Flipkart URL at all - silently, with no log and
+	# no message. L16097 sat with a perfectly good URL saved and custom_fsn_no
+	# still empty, which sent us hunting a scraper fault that did not exist.
+	if doc.get("custom_url") or doc.get("custom_fsn_no"):
+		_sync_flipkart_item(doc)
 
-		category_names = frappe.db.get_list("Item Category", fields=['category_name'], pluck='category_name')
 
-		if doc.get("custom_url"):
-			fsn = extract_pid_with_regex(doc.get('custom_url'))
-		else:
-			fsn = doc.get('custom_fsn_no')
+def _flipkart_item_details_row(doc, url, fsn):
+	"""The Item Details row this item's Flipkart data belongs on.
 
-		doc.custom_fsn_no = fsn
-		data = scrape(fsn)
+	An Item links to exactly one Item Details record, so on an Amazon-matched
+	item the Flipkart data has to land on the row Keepa already fills. Creating
+	a second row for the URL and repointing custom_item_detail at it would
+	orphan everything Amazon wrote and make the "Item Extra Details" button open
+	the wrong record.
+	"""
+	name = None
+	if doc.get("custom_item_detail") and frappe.db.exists("Item Details", doc.get("custom_item_detail")):
+		name = doc.get("custom_item_detail")
+	if not name and doc.get("custom_asin_no"):
+		name = frappe.db.exists("Item Details", {"asin_no": doc.get("custom_asin_no")})
+	if not name and url:
+		name = frappe.db.exists("Item Details", {"url": url})
+	if not name and fsn:
+		# Keyed on the resolved FSN, never on custom_fsn_no while it may still be
+		# empty: exists() with a None value matches the first row whose fsn_no is
+		# NULL, which is some other item's record.
+		name = frappe.db.exists("Item Details", {"fsn_no": fsn})
 
-		# A blocked or failed fetch returns every key empty, and the block below
-		# writes all of them back unconditionally - which blanks the item's name,
-		# description and image, and resets custom_mrp to 0. That last one is
-		# quietly destructive: MRP drives the SAVE line on the printed label.
-		#
-		# Flipkart answers datacenter IPs with a bot-check page rather than an
-		# error, so this is the normal case on a hosted site, not an edge case.
-		# Leave the item exactly as it was and record why.
-		if not data.get("title"):
-			# The Item Details row was created above, so link it even though it
-			# is empty: the "Item Extra Details" button only renders when this
-			# field is set, and without it staff cannot open the record to fill
-			# anything in by hand.
-			if item_detail and not doc.get("custom_item_detail"):
-				doc.custom_item_detail = item_detail.name
+	if name:
+		row = frappe.get_doc("Item Details", name)
+	else:
+		row = frappe.new_doc("Item Details")
+		row.url = url or None
+		row.fsn_no = fsn
+		row.insert(ignore_permissions=True)
 
-			frappe.log_error(
-				f"Flipkart returned no product data for FSN {fsn}. "
-				f"The item was left unchanged. Check whether this host can "
-				f"reach flipkart.com at all - see "
-				f"luckybee_customization.api.net_check.check_outbound.",
-				"Flipkart Scraper",
-			)
-			return
+	clear_dangling_item_link(row)
+	return row
 
-		doc.item_name = data['title'][0:130]
-		doc.description = data['description']
-		item_detail.set('item_groups', [])
 
-		for category in data['categories']:
-			if category not in category_names:
-				cat = frappe.new_doc("Item Category")
-				cat.category_name = category
-				cat.insert(ignore_permissions=True)
-				item_detail.append("item_groups", {
-					'item_group': cat.name
-				})
-			else:
-				item_category_id = frappe.db.get_value('Item Category', {'category_name': category})
-				item_detail.append('item_groups', {
-					'item_group': item_category_id
-				})
+def _sync_flipkart_item(doc):
+	"""Scrape Flipkart for this item's URL/FSN and record what comes back.
 
-		doc.image = data['image_url']
-		set_images(doc, data['multiple_images'])
+	Runs whether or not the item is also matched on Amazon. When it is, Amazon
+	owns the item's identity - name, description, image, MRP - so only
+	Flipkart's own numbers are written and nothing Keepa established is
+	touched. With no ASIN there is nothing to protect, so Flipkart fills the
+	item exactly as it always has.
+	"""
+	amazon_owned = bool(doc.get("custom_asin_no"))
 
-		item_detail.model_flipkart = data['specifications'].get('General', {}).get('Model Name', "")
-		dims = data['specifications'].get("Dimensions", {})
-		item_detail.length_breadth = dims.get('Width', "")
-		item_detail.length_height = dims.get('Height', "")
+	url = (doc.get("custom_url") or "").strip()
+	fsn = extract_pid_with_regex(url) if url else (doc.get("custom_fsn_no") or "").strip()
+
+	if not fsn:
+		frappe.log_error(
+			f"No FSN in the Flipkart URL for {doc.get('name') or doc.get('item_code')}:\n"
+			f"{url}\n\n"
+			f"The FSN is read from the pid= parameter, never from lid= (which "
+			f"contains it as a substring plus extra characters). A share link "
+			f"(dl.flipkart.com/s/...) or a /p/ link with its query stripped does "
+			f"not carry one - open the product on flipkart.com and copy the full "
+			f"address-bar URL.",
+			"Flipkart Scraper",
+		)
+		return
+
+	# Correct regardless of whether the page fetch then succeeds.
+	doc.custom_fsn_no = fsn
+
+	item_detail = _flipkart_item_details_row(doc, url, fsn)
+
+	data = scrape(fsn)
+
+	# A blocked or failed fetch returns every key empty, and writing those back
+	# would blank the item's name, description and image and reset custom_mrp to
+	# 0 - quietly destructive, since MRP drives the SAVE line on the printed
+	# label. Flipkart answers datacenter IPs with a bot-check page rather than an
+	# error, so this is the normal case on a hosted site, not an edge case.
+	# Leave the item exactly as it was and record why.
+	if not data.get("title"):
+		# Link the (possibly empty) row anyway: the "Item Extra Details" button
+		# only renders when this field is set, and without it staff cannot open
+		# the record to fill anything in by hand.
+		if item_detail and not doc.get("custom_item_detail"):
+			doc.custom_item_detail = item_detail.name
+
+		frappe.log_error(
+			f"Flipkart returned no product data for FSN {fsn}. "
+			f"The item was left unchanged. Check whether this host can "
+			f"reach flipkart.com at all - see "
+			f"luckybee_customization.api.net_check.check_outbound.",
+			"Flipkart Scraper",
+		)
+		return
+
+	specs = data.get("specifications") or {}
+
+	# --- Flipkart's own numbers -------------------------------------------
+	# These describe the Flipkart listing rather than the item itself, so they
+	# have no Amazon counterpart to overwrite and are always safe to record.
+	item_detail.url = url or item_detail.url
+	item_detail.fsn_no = fsn
+	item_detail.title_flipkart = data["title"]
+	item_detail.flipkart_rating = data["rating"]
+	item_detail.flipkart_reviews_count = (data["reviews"] or "").split(" ")[0]
+	item_detail.flipkart_ratings_count = data["ratings"]
+	item_detail.flipkart_dis_per = data["discount"]
+	item_detail.spec_html_data = str(data["general"])
+
+	# --- the item's identity ----------------------------------------------
+	# Only when Amazon has not already established it. The dimensions and model
+	# go here too: their Item Details fields are not Flipkart-specific, and on a
+	# matched item they describe the same product Keepa is describing.
+	if not amazon_owned:
+		doc.item_name = data["title"][0:130]
+		doc.description = data["description"]
+		doc.image = data["image_url"]
+		set_images(doc, data["multiple_images"])
 
 		# custom_mrp is the printed MRP, and it drives the SAVE line on the
 		# product label - so it must be Flipkart's struck-through MRP, not what
@@ -985,15 +1031,25 @@ def _sync_keepa_item_internal(doc, event):
 		# which on the test product meant storing 2700 as the "MRP" when the
 		# real MRP was 7999, wiping the saving out of the label entirely.
 		# Falls back to the selling price only when no MRP is published.
-		doc.custom_mrp = data.get('mrp') or data['price']
-		item_detail.title_flipkart = data['title']
-		item_detail.flipkart_rating = data['rating']
-		reviews=data['reviews'].split(" ")[0]
-		item_detail.flipkart_reviews_count =reviews
-		item_detail.flipkart_ratings_count = data['ratings']
-		item_detail.fsn_no = doc.get('custom_fsn_no')
-		item_detail.flipkart_dis_per =data['discount']
-		item_detail.spec_html_data = str(data['general'])
-		item_detail.save(ignore_permissions=True)
-		doc.custom_item_detail=item_detail.name
+		doc.custom_mrp = data.get("mrp") or data["price"]
+
+		item_detail.model_flipkart = specs.get("General", {}).get("Model Name", "")
+		dims = specs.get("Dimensions", {})
+		item_detail.length_breadth = dims.get("Width", "")
+		item_detail.length_height = dims.get("Height", "")
+
+		category_names = frappe.db.get_list("Item Category", fields=["category_name"], pluck="category_name")
+		item_detail.set("item_groups", [])
+		for category in data["categories"]:
+			if category not in category_names:
+				cat = frappe.new_doc("Item Category")
+				cat.category_name = category
+				cat.insert(ignore_permissions=True)
+				item_detail.append("item_groups", {"item_group": cat.name})
+			else:
+				item_category_id = frappe.db.get_value("Item Category", {"category_name": category})
+				item_detail.append("item_groups", {"item_group": item_category_id})
+
+	item_detail.save(ignore_permissions=True)
+	doc.custom_item_detail = item_detail.name
 
