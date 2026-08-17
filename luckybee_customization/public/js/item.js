@@ -12,6 +12,8 @@ frappe.ui.form.on('Item', {
         move_connections_tab_to_end(frm);
         render_velocity_dashboard(frm);
         render_amazon_image_gallery(frm);
+        render_flipkart_image_gallery(frm);
+        render_price_decision(frm);
         render_lucky_bee_image_gallery(frm);
         render_marketplace_links(frm);
         render_supplier_history(frm);
@@ -435,6 +437,110 @@ function render_amazon_image_gallery(frm) {
     `).join('');
 
     wrapper.html(`<div style="display:flex; flex-wrap:wrap; align-items:flex-start;">${thumbs}</div>`);
+}
+
+function render_flipkart_image_gallery(frm) {
+    const wrapper = frm.get_field('fk_image_gallery') && frm.get_field('fk_image_gallery').$wrapper;
+    if (!wrapper) return;
+
+    const rows = (frm.doc.fk_image_urls || [])
+        .filter(r => r.image_url)
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+    if (!rows.length) {
+        wrapper.html('<div class="text-muted small">No Flipkart images synced.</div>');
+        return;
+    }
+
+    const thumbs = rows.map(r => `
+        <a href="${frappe.utils.escape_html(r.image_url)}" target="_blank" rel="noopener"
+           style="display:inline-block; margin:0 8px 8px 0;">
+            <img src="${frappe.utils.escape_html(r.image_url)}"
+                 title="${frappe.utils.escape_html(String(r.sequence || ''))}"
+                 style="width:90px; height:90px; object-fit:contain; border:1px solid var(--border-color); border-radius:6px; background:#fff;"
+                 onerror="this.closest('a').style.display='none'" />
+        </a>
+    `).join('');
+
+    wrapper.html(
+        `<div style="display:flex; flex-wrap:wrap; align-items:flex-start;">${thumbs}</div>
+         <div class="text-muted small" style="margin-top:4px;">
+            Reference only - Flipkart's photographs are not ours to publish.
+         </div>`);
+}
+
+// Changes.docx A4 - the selling-decision block.
+//
+// Rendered rather than stored: our price, the Amazon price and the Flipkart
+// price each move on their own, and a stored verdict would be stale the moment
+// any one of them changed. The price to beat is the LOWER of the two
+// marketplaces - beating only the dearer one is not beating the market.
+function render_price_decision(frm) {
+    const wrapper = frm.get_field('lb_price_decision') && frm.get_field('lb_price_decision').$wrapper;
+    if (!wrapper) return;
+
+    // Our price is the Standard Selling Item Price - the same figure the label
+    // prints and the till charges. standard_rate agrees on all but a handful of
+    // items, and on those few a block that contradicted the printed label would
+    // be worse than no block at all.
+    frappe.db.get_value('Item Price',
+        { item_code: frm.doc.name, price_list: 'Standard Selling' },
+        'price_list_rate',
+        (r) => paint_price_decision(frm, wrapper,
+            flt(r && r.price_list_rate) || flt(frm.doc.standard_rate) || 0));
+}
+
+function paint_price_decision(frm, wrapper, ours) {
+    const money = v => format_currency(v, 'INR');
+    const amazon = flt(frm.doc.amz_best_price) || 0;
+    const flipkart = flt(frm.doc.fk_price) || 0;
+
+    const online = [amazon, flipkart].filter(v => v > 0);
+    const toBeat = online.length ? Math.min(...online) : 0;
+
+    let colour, label, detail;
+    if (!toBeat) {
+        colour = '#6c757d';
+        label = 'No online price';
+        detail = 'Nothing to compare against - price on MRP and margin.';
+    } else if (!ours) {
+        colour = '#6c757d';
+        label = 'No selling price set';
+        detail = 'Set a selling price to compare against the market.';
+    } else if (ours < toBeat) {
+        colour = '#1b7f3b';
+        label = 'Cheaper than online';
+        detail = `We are ${money(toBeat - ours)} below the best online price.`;
+    } else if (ours > toBeat) {
+        colour = '#c0392b';
+        label = 'Above online';
+        detail = `We are ${money(ours - toBeat)} MORE expensive than the best online price.`;
+    } else {
+        colour = '#6c757d';
+        label = 'Same as online';
+        detail = 'Matched to the best online price.';
+    }
+
+    const cell = (heading, value, muted) => `
+        <div style="flex:1 1 0; min-width:90px; text-align:center; padding:6px 4px;">
+            <div class="text-muted" style="font-size:11px; letter-spacing:.3px;">${heading}</div>
+            <div style="font-size:17px; font-weight:600; ${muted ? 'color:var(--text-muted);' : ''}">
+                ${value}
+            </div>
+        </div>`;
+
+    wrapper.html(`
+        <div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+            <div style="display:flex; align-items:stretch; background:var(--fg-color);">
+                ${cell('OUR PRICE', ours ? money(ours) : '-', !ours)}
+                ${cell('AMAZON', amazon ? money(amazon) : '-', !amazon)}
+                ${cell('FLIPKART', flipkart ? money(flipkart) : '-', !flipkart)}
+            </div>
+            <div style="background:${colour}; color:#fff; padding:6px 10px;">
+                <span style="font-weight:600;">${label}</span>
+                <span style="opacity:.9; margin-left:8px; font-size:12px;">${detail}</span>
+            </div>
+        </div>`);
 }
 
 function render_velocity_dashboard(frm) {

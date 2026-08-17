@@ -26,3 +26,4 @@ luckybee_customization.patches.pos_salesperson_fields
 luckybee_customization.patches.ensure_flipkart_fields
 luckybee_customization.patches.codes_and_flipkart_price
 luckybee_customization.patches.pos_upi_fields
+luckybee_customization.patches.flipkart_surface_fields

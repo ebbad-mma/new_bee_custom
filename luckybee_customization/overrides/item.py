@@ -7,7 +7,7 @@ from luckybee_customization.overrides.item_details import (
 )
 from frappe import _
 import re
-from frappe.utils import today
+from frappe.utils import cint, flt, today
 from .scraper_utils import scrape, set_images, extract_pid_with_regex
 from luckybee_customization.item_hooks import mark_system_field_modified
 
@@ -945,6 +945,87 @@ def _flipkart_item_details_row(doc, url, fsn):
 	return row
 
 
+def _fk_pairs_to_text(pairs):
+	"""Label/value pairs as readable lines rather than raw JSON.
+
+	These are read by staff pricing a product, not by code. A Code field full of
+	JSON is technically complete and practically ignored.
+	"""
+	lines = []
+	for entry in pairs or []:
+		if isinstance(entry, dict):
+			label = (entry.get("label") or entry.get("key") or "").strip()
+			value = entry.get("value")
+		elif isinstance(entry, (list, tuple)) and len(entry) == 2:
+			label, value = str(entry[0]).strip(), entry[1]
+		else:
+			lines.append(str(entry).strip())
+			continue
+		if isinstance(value, (list, tuple)):
+			value = ", ".join(str(v) for v in value if v)
+		value = str(value or "").strip()
+		lines.append(f"{label}: {value}" if label else value)
+	return "\n".join(l for l in lines if l)
+
+
+def _apply_flipkart_to_item(doc, data):
+	"""Changes.docx A5 - surface the Flipkart record on the Item form.
+
+	Every write is guarded by has_field so an older site missing the patch still
+	syncs rather than raising, and each group is independent: a product with no
+	variants must not cost us its specifications.
+	"""
+	def put(fieldname, value):
+		if doc.meta.has_field(fieldname):
+			doc.set(fieldname, value)
+
+	put("fk_title", data.get("title") or "")
+	put("fk_rating", flt(data.get("rating")) or 0)
+	put("fk_ratings_count", cint(str(data.get("ratings_count") or data.get("ratings") or "0").replace(",", "") or 0))
+	put("fk_reviews_count", cint(str(data.get("reviews_count") or "0").replace(",", "") or 0))
+	put("fk_discount_pct", flt(data.get("discount")) or 0)
+
+	put("fk_highlights", "\n".join(
+		str(h).strip() for h in (data.get("highlights") or []) if str(h).strip()))
+
+	variants = data.get("variants") or []
+	put("fk_variants", "\n".join(
+		str(v.get("title") or v.get("label") or v) if isinstance(v, dict) else str(v)
+		for v in variants[:40]))
+
+	specs = data.get("specifications") or {}
+	spec_lines = []
+	for group, rows in specs.items():
+		spec_lines.append(f"[{group}]")
+		if isinstance(rows, dict):
+			spec_lines += [f"{k}: {v}" for k, v in rows.items()]
+		else:
+			spec_lines.append(_fk_pairs_to_text(rows))
+	put("fk_specifications", "\n".join(spec_lines))
+
+	sections = data.get("detail_sections") or {}
+	section_lines = []
+	for name, body in sections.items():
+		section_lines.append(f"[{name}]")
+		if isinstance(body, dict):
+			section_lines += [f"{k}: {v}" for k, v in body.items()]
+		elif isinstance(body, (list, tuple)):
+			section_lines.append(_fk_pairs_to_text(body))
+		else:
+			section_lines.append(str(body))
+	put("fk_detail_sections", "\n".join(section_lines))
+
+	# Reference only - Flipkart's photographs are not ours to publish, so these
+	# fill their own table and never touch lb_primary_image.
+	images = [u for u in (data.get("multiple_images") or []) if u]
+	if images and doc.meta.has_field("fk_image_urls"):
+		existing = [r.image_url for r in (doc.get("fk_image_urls") or [])]
+		if existing != images:
+			doc.set("fk_image_urls", [])
+			for idx, url in enumerate(images):
+				doc.append("fk_image_urls", {"image_url": url, "sequence": idx + 1})
+
+
 def _sync_flipkart_item(doc):
 	"""Scrape Flipkart for this item's URL/FSN and record what comes back.
 
@@ -1023,6 +1104,11 @@ def _sync_flipkart_item(doc):
 		doc.fk_price = data["price"] or 0
 	if doc.meta.has_field("fk_last_synced"):
 		doc.fk_last_synced = today()
+
+	# Changes.docx A5 - the rest of the Flipkart record onto the Item form.
+	# Item Details keeps its copy as the archive; these are the ones read during
+	# a selling decision, and nobody opens a linked doctype mid-sale.
+	_apply_flipkart_to_item(doc, data)
 
 	# --- the item's identity ----------------------------------------------
 	# Only when Amazon has not already established it. The dimensions and model
