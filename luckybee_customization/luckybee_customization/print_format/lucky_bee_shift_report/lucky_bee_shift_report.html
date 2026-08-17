@@ -1,0 +1,129 @@
+{#-
+	The evening reconciliation slip: what was in the drawer, what should have
+	been, and what sold. Laid out for an 80mm till roll, which is what the
+	counter already prints receipts on - it also prints acceptably on A4.
+
+	Every figure comes from the POS Closing Shift itself. Nothing is recomputed
+	here: the expected amounts are ERPNext's own, so the printed slip and the
+	screen can never disagree.
+-#}
+{#- Print formats render in Frappe's Jinja sandbox, which exposes db.get_value
+    but not get_cached_value - the cached variant raises AttributeError here. -#}
+{%- set currency = doc.get("currency") or frappe.db.get_value("Company", doc.company, "default_currency") -%}
+
+<div class="lb-shift">
+	<div class="lb-head">
+		<div class="lb-company">{{ doc.company }}</div>
+		<div class="lb-title">Shift Report</div>
+		<div class="lb-sub">{{ doc.name }}</div>
+	</div>
+
+	<table class="lb-meta">
+		<tr><td>Till</td><td>{{ doc.pos_profile or "-" }}</td></tr>
+		<tr><td>Cashier</td><td>{{ frappe.db.get_value("User", doc.user, "full_name") or doc.user }}</td></tr>
+		<tr><td>Opened</td><td>{{ frappe.utils.format_datetime(doc.period_start_date, "dd-MM-yyyy HH:mm") }}</td></tr>
+		<tr><td>Closed</td><td>{{ frappe.utils.format_datetime(doc.period_end_date, "dd-MM-yyyy HH:mm") }}</td></tr>
+	</table>
+
+	<div class="lb-section">Cash &amp; payments</div>
+	{#- One block per payment mode rather than a five-column table: on an 80mm
+	    roll five money columns do not fit, and the one that fell off the edge
+	    was Difference - the single figure the whole slip exists for. -#}
+	{%- set ns = namespace(opening=0, expected=0, counted=0, diff=0) -%}
+	{%- for row in doc.payment_reconciliation -%}
+		{%- set ns.opening = ns.opening + (row.opening_amount or 0) -%}
+		{%- set ns.expected = ns.expected + (row.expected_amount or 0) -%}
+		{%- set ns.counted = ns.counted + (row.closing_amount or 0) -%}
+		{%- set ns.diff = ns.diff + (row.difference or 0) -%}
+	<div class="lb-mode">
+		<div class="lb-mode-name">{{ row.mode_of_payment }}</div>
+		<table class="lb-figs">
+			<tr>
+				<td>Opening</td><td class="r">{{ frappe.utils.fmt_money(row.opening_amount or 0, currency=currency) }}</td>
+				<td>Expected</td><td class="r">{{ frappe.utils.fmt_money(row.expected_amount or 0, currency=currency) }}</td>
+			</tr>
+			<tr>
+				<td>Counted</td><td class="r">{{ frappe.utils.fmt_money(row.closing_amount or 0, currency=currency) }}</td>
+				<td>Difference</td>
+				<td class="r {% if (row.difference or 0)|round(2) != 0 %}lb-flag{% endif %}">
+					{{ frappe.utils.fmt_money(row.difference or 0, currency=currency) }}
+				</td>
+			</tr>
+		</table>
+	</div>
+	{%- endfor %}
+	<table class="lb-figs lb-totals">
+		<tr>
+			<td>Total expected</td><td class="r">{{ frappe.utils.fmt_money(ns.expected, currency=currency) }}</td>
+			<td>Total counted</td><td class="r">{{ frappe.utils.fmt_money(ns.counted, currency=currency) }}</td>
+		</tr>
+	</table>
+
+	{%- if ns.diff|round(2) != 0 %}
+	<div class="lb-note">
+		{% if ns.diff > 0 %}Drawer is over by{% else %}Drawer is short by{% endif %}
+		<b>{{ frappe.utils.fmt_money(ns.diff|abs, currency=currency) }}</b>
+	</div>
+	{%- endif %}
+
+	<div class="lb-section">Sales</div>
+	<table class="lb-table">
+		<tr><td class="l">Invoices</td><td class="r">{{ doc.pos_transactions|length }}</td></tr>
+		<tr><td class="l">Items sold</td><td class="r">{{ (doc.total_quantity or 0)|round(2) }}</td></tr>
+		<tr><td class="l">Net total</td><td class="r">{{ frappe.utils.fmt_money(doc.net_total or 0, currency=currency) }}</td></tr>
+		{%- for tax in doc.taxes %}
+		<tr><td class="l">{{ tax.account_head }}{% if tax.rate %} ({{ tax.rate }}%){% endif %}</td>
+			<td class="r">{{ frappe.utils.fmt_money(tax.amount or 0, currency=currency) }}</td></tr>
+		{%- endfor %}
+		<tr class="lb-grand">
+			<td class="l">Grand total</td>
+			<td class="r">{{ frappe.utils.fmt_money(doc.grand_total or 0, currency=currency) }}</td>
+		</tr>
+	</table>
+
+	<div class="lb-sign">
+		<div>Cashier ____________________</div>
+		<div>Manager ____________________</div>
+	</div>
+
+	<div class="lb-foot">
+		Printed {{ frappe.utils.format_datetime(frappe.utils.now(), "dd-MM-yyyy HH:mm") }}
+		by {{ frappe.session.user }}
+	</div>
+</div>
+
+<style>
+	.lb-shift { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 11px; color: #000; }
+	.lb-head { text-align: center; margin-bottom: 8px; }
+	.lb-company { font-size: 13px; font-weight: 700; }
+	.lb-title { font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+	.lb-sub { font-size: 10px; color: #444; }
+	.lb-meta { width: 100%; margin-bottom: 8px; }
+	.lb-meta td { padding: 1px 0; }
+	.lb-meta td:first-child { color: #444; width: 34%; }
+	.lb-section {
+		font-weight: 700; text-transform: uppercase; font-size: 10px;
+		letter-spacing: .05em; border-bottom: 1px solid #000;
+		padding-bottom: 2px; margin: 10px 0 4px;
+	}
+	.lb-mode { margin-bottom: 6px; }
+	.lb-mode-name { font-weight: 700; }
+	.lb-figs { width: 100%; border-collapse: collapse; font-size: 10px; }
+	.lb-figs td { padding: 1px 0; white-space: nowrap; }
+	.lb-figs td:nth-child(odd) { color: #444; padding-right: 3px; }
+	.lb-figs td.r { text-align: right; padding-right: 8px; }
+	.lb-totals { border-top: 1px solid #000; font-weight: 700; margin-top: 4px; }
+	.lb-totals td { color: #000 !important; }
+	.lb-table { width: 100%; border-collapse: collapse; }
+	.lb-table th, .lb-table td { padding: 2px 0; vertical-align: top; }
+	.lb-table thead th { border-bottom: 1px dashed #999; font-size: 10px; }
+	.lb-table tfoot td { border-top: 1px solid #000; font-weight: 700; }
+	.lb-table .l { text-align: left; }
+	.lb-table .r { text-align: right; white-space: nowrap; padding-left: 4px; }
+	.lb-flag { font-weight: 700; }
+	.lb-note { margin-top: 6px; padding: 4px; border: 1px solid #000; text-align: center; }
+	.lb-grand td { border-top: 1px solid #000; font-weight: 700; font-size: 12px; }
+	.lb-sign { margin-top: 18px; font-size: 10px; line-height: 2.4; }
+	.lb-foot { margin-top: 10px; font-size: 9px; color: #555; text-align: center; }
+	@media print { .lb-shift { font-size: 10px; } }
+</style>

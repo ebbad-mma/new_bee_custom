@@ -31,6 +31,10 @@ app_include_js = [
 
 # include js in page
 # page_js = {"page" : "public/js/file.js"}
+page_js = {
+    # Adds the "Show UPI QR" button to ERPNext's own POS payment screen.
+    "point-of-sale": "public/js/pos_upi_qr.js"
+}
 
 # include js in doctype views
 doctype_js = {

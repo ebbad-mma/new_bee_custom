@@ -210,6 +210,254 @@ def _specifications(soup):
 	return specs
 
 
+# --- Flipkart's embedded page state -------------------------------------
+#
+# Changes.docx A5 asks for the full product record - photos, variants,
+# highlights, every detail tab - and none of that is in the schema.org block the
+# rest of this module reads. It is in window.__INITIAL_STATE__, a ~650KB JSON
+# blob of widget data.
+#
+# Keying on that blob rather than on CSS class names is the point: the widgets
+# are addressed by `widgetType` ("atlas_product_details",
+# "atlas_multimedia_inline_slider"), which is Flipkart's own stable vocabulary,
+# not the obfuscated build-artefact class names that made the previous scraper
+# fail on every deploy. Each extractor below is independently optional - a
+# missing widget costs that one group, never the whole scrape.
+
+_STATE_RE = re.compile(r"window\.__INITIAL_STATE__\s*=\s*({.*?});?\s*</script>", re.S)
+
+# Flipkart serves image URLs as templates: .../image/{@width}/{@height}/...
+_IMAGE_SIZE = "1500"
+
+
+def _page_state(html):
+	"""The parsed __INITIAL_STATE__ blob, or {} if it is absent/unparseable."""
+	match = _STATE_RE.search(html or "")
+	if not match:
+		return {}
+	try:
+		return json.loads(match.group(1))
+	except Exception:
+		return {}
+
+
+def _slots(state):
+	"""[(widget_type, widget_data)] for every widget on the page, in order."""
+	out = []
+	try:
+		slots = state["multiWidgetState"]["widgetsData"]["slots"]
+	except Exception:
+		return out
+	for slot in slots:
+		widget = (slot.get("slotData") or {}).get("widget") or {}
+		widget_type = (widget.get("tracking") or {}).get("widgetType")
+		if widget_type:
+			out.append((widget_type, widget.get("data") or {}))
+	return out
+
+
+def _slot_data(state, widget_type):
+	for found_type, data in _slots(state):
+		if found_type == widget_type:
+			return data
+	return {}
+
+
+def _dls_pairs(node, pairs=None):
+	"""Label/value rows out of Flipkart's DLS tree.
+
+	A row is {label_0: {value: {text: "Brand"}}, label_1: {value: {text:
+	["FnS"]}}} - the key is a string, the value is a list of strings. Walking for
+	that shape rather than for fixed paths keeps this working when Flipkart
+	nests the same row one level deeper on another page.
+	"""
+	if pairs is None:
+		pairs = []
+	if isinstance(node, dict):
+		key = _dls_text(node.get("label_0"))
+		value = _dls_text(node.get("label_1"))
+		if key and value:
+			pairs.append((key, value))
+		for child in node.values():
+			_dls_pairs(child, pairs)
+	elif isinstance(node, list):
+		for child in node:
+			_dls_pairs(child, pairs)
+	return pairs
+
+
+def _dls_text(node):
+	"""The text of a DLS label node, whether it holds a string or a list."""
+	if not isinstance(node, dict):
+		return ""
+	text = ((node.get("value") or {}).get("text")) if isinstance(node.get("value"), dict) else None
+	if isinstance(text, str):
+		return text.strip()
+	if isinstance(text, list):
+		return ", ".join(str(t).strip() for t in text if str(t).strip())
+	return ""
+
+
+def _dls_texts(node, out=None):
+	"""Every text leaf under a node, in document order."""
+	if out is None:
+		out = []
+	if isinstance(node, dict):
+		for key, value in node.items():
+			if key == "text":
+				if isinstance(value, str) and value.strip():
+					out.append(value.strip())
+				elif isinstance(value, list):
+					out.extend(str(v).strip() for v in value if str(v).strip())
+			else:
+				_dls_texts(value, out)
+	elif isinstance(node, list):
+		for value in node:
+			_dls_texts(value, out)
+	return out
+
+
+def _state_images(state):
+	"""Product photos, largest size, in the order Flipkart shows them.
+
+	Deliberately only the multimedia slider. The advertisement carousel sitting
+	next to it in the same blob is full of rukmini.flixcart.com URLs too - for
+	other sellers' products - so a blanket "collect every image URL" would file
+	competitors' photos as ours.
+	"""
+	data = _slot_data(state, "atlas_multimedia_inline_slider")
+	if not data:
+		return []
+
+	urls = []
+
+	def collect(node):
+		if isinstance(node, dict):
+			for key, value in node.items():
+				if isinstance(value, str) and "flixcart.com/image/" in value:
+					urls.append(value)
+				else:
+					collect(value)
+		elif isinstance(node, list):
+			for value in node:
+				collect(value)
+
+	collect(data)
+
+	seen = set()
+	out = []
+	for url in urls:
+		url = url.replace("{@width}", _IMAGE_SIZE).replace("{@height}", _IMAGE_SIZE)
+		if url not in seen:
+			seen.add(url)
+			out.append(url)
+	return out
+
+
+def _state_variants(state):
+	"""Every variant Flipkart offers, from the colour and size swatches.
+
+	contentTitle carries the variant's label ("CBLACK/FTWWHT", "5.5") and
+	contentType says whether it is in stock, which matters: a size that is out of
+	stock everywhere is not a variant worth chasing.
+	"""
+	variants = []
+	seen = set()
+
+	for widget_type, data in _slots(state):
+		if widget_type not in ("atlas_swatch_attribute", "atlas_swatch_image"):
+			continue
+
+		# "Selected Color:" / "Select Size" - names the group the swatches belong to.
+		heading = ""
+		for text in _dls_texts(data):
+			if text.lower().startswith(("select", "selected")):
+				heading = text.rstrip(":").replace("Selected", "").replace("Select", "").strip()
+				break
+
+		def collect(node):
+			if isinstance(node, dict):
+				tracking = (node.get("tracking") or {}) if isinstance(node.get("tracking"), dict) else {}
+				title = (tracking.get("contentTitle") or "").strip()
+				if title and title not in ("N", "NA"):
+					content_type = tracking.get("contentType") or ""
+					key = (heading, title)
+					if key not in seen:
+						seen.add(key)
+						variants.append({
+							"attribute": heading or "Variant",
+							"value": title,
+							"in_stock": 0 if "OutOfStock" in content_type else 1,
+						})
+				for value in node.values():
+					collect(value)
+			elif isinstance(node, list):
+				for value in node:
+					collect(value)
+
+		collect(data)
+
+	return variants
+
+
+def _state_highlights(state):
+	"""The "Product highlights" grid, as key/value pairs."""
+	return _dls_pairs(_slot_data(state, "atlas_product_details"))
+
+
+def _state_detail_sections(state):
+	"""The "All details" tabs: Specifications, Description, Warranty and the rest.
+
+	Returned as {tab name: [(key, value)]} plus a "Description" entry for the
+	prose block, which has no key/value shape.
+	"""
+	sections = {}
+
+	# Matched on prefix, not on an exact name: the same widget arrives as
+	# "atlas_rich_product_details_vertical_list" on one product and
+	# "atlas_rich_product_details" on another, and its inner key is
+	# "rpd_tab_showcase_vertical_list_0" or
+	# "rpd_tab_feature_descricption_manufacture_layout_1" (Flipkart's typo, not
+	# ours). Pinning either exactly means half the catalogue returns nothing.
+	for widget_type, data in _slots(state):
+		if not widget_type.startswith("atlas_rich_product_details"):
+			continue
+
+		for key, node in (data.get("dlsData") or {}).items():
+			if not key.startswith("rpd_tab"):
+				continue
+
+			pairs = _dls_pairs(node)
+			if pairs:
+				sections.setdefault("Specifications", []).extend(
+					p for p in pairs if p not in sections.get("Specifications", [])
+				)
+
+			# The prose block is the longest text leaf; spec values are short.
+			texts = [t for t in _dls_texts(node) if len(t) > 200]
+			if texts:
+				longest = max(texts, key=len)
+				if len(longest) > len(sections.get("Description", "")):
+					sections["Description"] = longest
+
+	return sections
+
+
+def _state_ratings(state):
+	"""Rating value, ratings count and reviews count.
+
+	Flipkart publishes all three as numbers in the page context, which is both
+	more precise and less fragile than the "based on 14 ratings" sentence the
+	rating widget renders.
+	"""
+	try:
+		pr = state["multiWidgetState"]["pageDataResponse"]["pageContext"][
+			"fdpEventTracking"]["events"]["psi"]["pr"]
+	except Exception:
+		return None, None, None
+	return pr.get("rating"), pr.get("ratingsCount"), pr.get("reviewsCount")
+
+
 def scrape(fsn):
 	"""Return the Flipkart data block for an FSN.
 
@@ -237,6 +485,11 @@ def scrape(fsn):
 		"description": "",
 		"availability": "",
 		"brand": "",
+		# A5 - the deep record, from the embedded page state.
+		"variants": [],
+		"detail_sections": {},
+		"ratings_count": None,
+		"reviews_count": None,
 	}
 
 	if not fsn:
@@ -317,6 +570,42 @@ def scrape(fsn):
 	specs = _specifications(soup)
 	data["specifications"] = specs
 	data["general"] = str(specs) if specs else ""
+
+	# --- A5: the deep record ------------------------------------------------
+	# Everything below is additive and individually optional. ld+json has
+	# already given us title, price and brand by this point, so a Flipkart
+	# redesign that breaks one of these extractors costs that group alone.
+	state = _page_state(page.text)
+	if state:
+		# The slider carries every photo Flipkart shows; ld+json carries five.
+		images = _state_images(state)
+		if images:
+			data["multiple_images"] = images
+			data["image_url"] = images[0]
+
+		data["variants"] = _state_variants(state)
+		data["highlights"] = _state_highlights(state)
+		data["detail_sections"] = _state_detail_sections(state)
+
+		if data["detail_sections"].get("Specifications") and not specs:
+			# Structural spec scraping found nothing - the state blob did.
+			data["specifications"] = {"General": dict(data["detail_sections"]["Specifications"])}
+			data["general"] = str(data["specifications"])
+
+		if not data["description"] and data["detail_sections"].get("Description"):
+			data["description"] = data["detail_sections"]["Description"]
+
+		rating, ratings_count, reviews_count = _state_ratings(state)
+		# ld+json omits aggregateRating on plenty of products that do have
+		# ratings, so prefer the page context and fall back to what we had.
+		if rating is not None:
+			data["rating"] = _to_number(rating)
+		if ratings_count is not None:
+			data["ratings"] = str(ratings_count)
+			data["ratings_count"] = ratings_count
+		if reviews_count is not None:
+			data["reviews"] = str(reviews_count)
+			data["reviews_count"] = reviews_count
 
 	return data
 

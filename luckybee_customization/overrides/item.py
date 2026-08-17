@@ -1015,6 +1015,15 @@ def _sync_flipkart_item(doc):
 	item_detail.flipkart_dis_per = data["discount"]
 	item_detail.spec_html_data = str(data["general"])
 
+	# Changes.docx A3 - the competitor price belongs on the Item itself, beside
+	# AMZ Best Price, not only in Extra Details: it is read while deciding what
+	# to sell at. fk_last_synced dates it, so a price from three weeks ago is
+	# visible as such rather than being read as today's.
+	if doc.meta.has_field("fk_price"):
+		doc.fk_price = data["price"] or 0
+	if doc.meta.has_field("fk_last_synced"):
+		doc.fk_last_synced = today()
+
 	# --- the item's identity ----------------------------------------------
 	# Only when Amazon has not already established it. The dimensions and model
 	# go here too: their Item Details fields are not Flipkart-specific, and on a

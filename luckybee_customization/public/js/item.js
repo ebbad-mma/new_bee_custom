@@ -13,6 +13,7 @@ frappe.ui.form.on('Item', {
         render_velocity_dashboard(frm);
         render_amazon_image_gallery(frm);
         render_lucky_bee_image_gallery(frm);
+        render_marketplace_links(frm);
         render_supplier_history(frm);
         render_amazon_freshness(frm);
         add_refresh_amazon_button(frm);
@@ -315,6 +316,44 @@ function set_filter_in_subcat_on_the_basis_of_cat(frm) {
     });
 }
 
+// Changes.docx A2 - ASIN and FSN are codes, not links, so checking a listing
+// meant copying the code and building the URL by hand. Rendered as a link under
+// each field: Frappe renders a field's description as HTML, which survives
+// refresh_field and needs no extra layout. Cleared when the code is, so a stale
+// link can never point at the previous item's listing.
+function render_marketplace_links(frm) {
+    const link = (url, text) =>
+        `<a href="${frappe.utils.escape_html(url)}" target="_blank" rel="noopener">${text} &#8599;</a>`;
+
+    const asin = (frm.doc.custom_asin_no || '').trim();
+    set_link_description(frm, 'custom_asin_no',
+        asin ? link(`https://www.amazon.in/dp/${encodeURIComponent(asin)}`, 'Open on Amazon') : '');
+
+    // The stored URL is the one staff actually pasted, so prefer it; the pid
+    // form is the fallback for an item that only ever had an FSN typed in.
+    const fsn = (frm.doc.custom_fsn_no || '').trim();
+    const url = (frm.doc.custom_url || '').trim();
+    set_link_description(frm, 'custom_fsn_no',
+        (url || fsn)
+            ? link(url || `https://www.flipkart.com/product/p/itme?pid=${encodeURIComponent(fsn)}`,
+                   'Open on Flipkart')
+            : '');
+}
+
+function set_link_description(frm, fieldname, html) {
+    const field = frm.get_field(fieldname);
+    if (!field) return;                      // field not on this form
+    // Keep any description the field was set up with, and append the link to it
+    // rather than overwriting - the FSN field explains where the code comes from.
+    if (field._lb_base_description === undefined) {
+        field._lb_base_description = field.df.description || '';
+    }
+    const base = field._lb_base_description;
+    const next = html ? (base ? `${base}<br>${html}` : html) : base;
+    if (field.df.description === next) return;
+    frm.set_df_property(fieldname, 'description', next);
+}
+
 // Our own photos, rendered as pictures. The lb_images grid can only print the
 // file path in its cell, so the section used to be a column of
 // "/private/files/capture_...jpg" with no way to see what was photographed.
@@ -554,6 +593,16 @@ frappe.ui.form.on('Item', {
     },
     lb_primary_image(frm) {
         render_lucky_bee_image_gallery(frm);
+    },
+    // The link has to follow the code as it is typed, not wait for a reload.
+    custom_asin_no(frm) {
+        render_marketplace_links(frm);
+    },
+    custom_fsn_no(frm) {
+        render_marketplace_links(frm);
+    },
+    custom_url(frm) {
+        render_marketplace_links(frm);
     }
 });
 

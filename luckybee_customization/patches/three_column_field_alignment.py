@@ -187,7 +187,7 @@ BLOCKS = [
 		"custom_column_break_xibxd",
 		"color", "size", "variation_attributes",
 		"cb_attributes_3",
-		"brand", "ean", "custom_last_supplier_purchase_rate",
+		"brand", "custom_last_supplier_purchase_rate",
 	],
 	[
 		"custom_section_break_ayvbe",
@@ -280,13 +280,18 @@ def _rearrange(order, block, fieldtypes):
 	return rest[:position] + present + strays + rest[position:]
 
 
-def _apply_field_order():
+def _apply_field_order(blocks):
+	"""Rewrite Item's field_order property setter with `blocks` applied.
+
+	Takes the blocks as an argument so later layout patches can reuse the
+	machinery rather than copying it - see codes_and_flipkart_price.py.
+	"""
 	meta = frappe.get_meta("Item", cached=False)
 	order = [df.fieldname for df in meta.fields]
 	fieldtypes = {df.fieldname: df.fieldtype for df in meta.fields}
 	before = set(order)
 
-	for block in BLOCKS:
+	for block in blocks:
 		order = _rearrange(order, block, fieldtypes)
 
 	# A reorder must never add or drop a field.
@@ -333,7 +338,7 @@ def execute():
 			frappe.db.set_value("Custom Field", name, "collapsible", 0)
 
 	frappe.clear_cache(doctype="Item")
-	_apply_field_order()
+	_apply_field_order(BLOCKS)
 	frappe.clear_cache(doctype="Item")
 	frappe.db.commit()
 	print("Patch three_column_field_alignment completed successfully.")
