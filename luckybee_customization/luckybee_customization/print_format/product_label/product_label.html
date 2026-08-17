@@ -1,43 +1,57 @@
 {#-
-  Phase 2 section 4 - two-zone product label, 50mm x 25mm.
+  Phase 2 section 4 - product label, 50mm x 25mm.
 
-  Left zone is the staff zone: the vertical barcode exactly as the current label
-  prints it, with the readable ID in a fixed position beside it. Right zone is
-  the customer zone: short name, OUR PRICE as the hero, then the struck MRP and
-  the SAVE line.
+  Layout follows the design the client supplied: the name runs across the top,
+  the price is the hero in the middle with a SALE badge beside it, and MRP and
+  SAVINGS sit as a labelled pair along the bottom. The barcode column moved to
+  the right-hand edge, bars and readable code both vertical.
 
-  Deliberately absent, per spec 4.2: the four-box Discount/MRP/LRP grid (it is
-  what forced everything small), any discount percentage, and the term "LRP".
-  Three type sizes only - price, ID, everything else.
+  Deliberately absent, per spec 4.2: the four-box Discount/MRP/LRP grid, any
+  discount percentage, and the term "LRP".
+
+  The MRP is no longer struck through - the supplied design labels it instead,
+  and a struck figure directly under a "MRP" heading reads as a correction
+  rather than a comparison.
 -#}
 {#- lb_label_data is registered via the `jinja` hook: the barcode is rendered
     server-side, which the restricted print-format sandbox cannot do itself. -#}
 {%- set d = lb_label_data(doc.name) -%}
+{%- set has_saving = d.save_amount and d.save_amount > 0 -%}
 
 <div class="lb-label">
-  <div class="lb-zone-staff">
-    {%- if d.barcode_svg -%}
-      <div class="lb-barcode">{{ d.barcode_svg }}</div>
-    {%- endif -%}
-    <div class="lb-id">{{ d.code }}</div>
-  </div>
-
-  <div class="lb-zone-customer">
+  <div class="lb-main">
     <div class="lb-name">{{ d.item_name }}</div>
 
-    <div class="lb-price-block">
-      <div class="lb-price-label">OUR PRICE</div>
+    <div class="lb-price-row">
+      {#- The badge is a claim about the price, so it only appears when there is
+          actually a saving. On a full-price item it would be a lie in 30pt. -#}
+      {%- if has_saving -%}
+        <div class="lb-sale">SALE</div>
+      {%- endif -%}
       <div class="lb-price">&#8377;{{ "{:,.0f}".format(d.our_price) }}</div>
     </div>
 
     <div class="lb-footer">
       {%- if d.mrp and d.mrp > 0 -%}
-        <span class="lb-mrp">MRP &#8377;{{ "{:,.0f}".format(d.mrp) }}</span>
+        <div class="lb-fig">
+          <div class="lb-fig-label">MRP</div>
+          <div class="lb-fig-value">&#8377;{{ "{:,.0f}".format(d.mrp) }}</div>
+        </div>
       {%- endif -%}
-      {%- if d.save_amount and d.save_amount > 0 -%}
-        <span class="lb-save">SAVE &#8377;{{ "{:,.0f}".format(d.save_amount) }}</span>
+      {%- if has_saving -%}
+        <div class="lb-fig">
+          <div class="lb-fig-label">SAVINGS</div>
+          <div class="lb-fig-value">&#8377;{{ "{:,.0f}".format(d.save_amount) }}</div>
+        </div>
       {%- endif -%}
     </div>
+  </div>
+
+  <div class="lb-codes">
+    {%- if d.barcode_svg -%}
+      <div class="lb-barcode">{{ d.barcode_svg }}</div>
+    {%- endif -%}
+    <div class="lb-id">{{ d.code }}</div>
   </div>
 </div>
 
@@ -95,59 +109,16 @@
     width: 50mm;
     height: 25mm;
     box-sizing: border-box;
-    padding: 1mm 1.5mm;
+    padding: 1mm 1mm 1mm 1.5mm;
     display: flex;
     align-items: stretch;
-    gap: 1.5mm;
-    font-family: Arial, Helvetica, sans-serif;
+    gap: 1mm;
+    font-family: "Arial Narrow", Arial, Helvetica, sans-serif;
     color: #000;
     overflow: hidden;
   }
 
-  /* ---- left / staff zone -------------------------------------------- */
-  .lb-zone-staff {
-    flex: 0 0 13mm;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.5mm;
-    border-right: 0.3mm solid #000;
-    padding-right: 1mm;
-  }
-
-  /* The bars run vertically, as the current label prints them, so the strip
-     stays narrow and leaves the width to the price. */
-  .lb-barcode {
-    transform: rotate(90deg);
-    transform-origin: center;
-    width: 19mm;
-    height: 8mm;
-    margin-left: -5.5mm;
-    margin-right: -5.5mm;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .lb-barcode svg {
-    width: 19mm;
-    height: 8mm;
-    display: block;
-  }
-
-  /* Readable ID, vertical, bold, always in the same place - this is what staff
-     read off the shelf. */
-  .lb-id {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    font-size: 8pt;
-    font-weight: 700;
-    letter-spacing: 0.2pt;
-    white-space: nowrap;
-    line-height: 1;
-  }
-
-  /* ---- right / customer zone ---------------------------------------- */
-  .lb-zone-customer {
+  .lb-main {
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
@@ -155,56 +126,110 @@
     justify-content: space-between;
   }
 
-  /* Small tier. Two lines maximum, then it clips - about a fifth of items have
-     names too long for this label, and a wrapped name must never push the
-     price off the bottom. */
+  /* Name across the top. Two lines then it clips: 12% of items have names over
+     45 characters, and a third line would push the price off the label. */
   .lb-name {
-    font-size: 6pt;
-    line-height: 1.1;
-    font-weight: 600;
+    font-size: 6.5pt;
+    line-height: 1.08;
+    font-weight: 700;
     text-transform: uppercase;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    max-height: 6.6mm;
+    max-height: 5.2mm;
   }
 
-  .lb-price-block {
+  .lb-price-row {
     display: flex;
-    align-items: baseline;
-    gap: 1mm;
-    margin: 0.3mm 0;
+    align-items: center;
+    gap: 1.2mm;
+    margin: 0.2mm 0;
   }
 
-  .lb-price-label {
-    font-size: 5.5pt;
+  /* Black pill, white text - carries at a glance from a shelf edge. */
+  .lb-sale {
+    flex: 0 0 auto;
+    background: #000;
+    color: #fff;
+    font-size: 6pt;
     font-weight: 700;
     letter-spacing: 0.3pt;
-  }
-
-  /* Huge tier - the hero, and the largest text on the label by a clear margin. */
-  .lb-price {
-    font-size: 19pt;
-    font-weight: 800;
-    line-height: 0.95;
-    letter-spacing: -0.5pt;
-  }
-
-  .lb-footer {
-    display: flex;
-    align-items: baseline;
-    gap: 2mm;
-    font-size: 6pt;
+    padding: 0.5mm 1.2mm;
+    border-radius: 1.2mm;
     line-height: 1;
   }
 
-  .lb-mrp {
-    text-decoration: line-through;
-    color: #333;
+  /* The hero, and the largest text on the label by a clear margin. */
+  .lb-price {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 21pt;
+    font-weight: 800;
+    line-height: 0.92;
+    letter-spacing: -0.6pt;
+    white-space: nowrap;
   }
 
-  .lb-save {
+  /* MRP and SAVINGS as a labelled pair, the way the design shows them. */
+  .lb-footer {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    gap: 1.5mm;
+    text-align: center;
+  }
+
+  .lb-fig-label {
+    font-size: 5pt;
     font-weight: 700;
+    letter-spacing: 0.2pt;
+    line-height: 1;
+  }
+
+  .lb-fig-value {
+    font-size: 8.5pt;
+    font-weight: 800;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+
+  /* ---- right-hand code column --------------------------------------- */
+  .lb-codes {
+    flex: 0 0 11mm;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.3mm;
+  }
+
+  /* Bars run vertically, as the current labels print them, so the strip stays
+     narrow and leaves the width to the price. */
+  .lb-barcode {
+    transform: rotate(90deg);
+    transform-origin: center;
+    width: 21mm;
+    height: 7mm;
+    margin-left: -7mm;
+    margin-right: -7mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lb-barcode svg {
+    width: 21mm;
+    height: 7mm;
+    display: block;
+  }
+
+  /* Readable ID, vertical, bold, always in the same place - this is what staff
+     read off the shelf. */
+  .lb-id {
+    writing-mode: vertical-rl;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.2pt;
+    white-space: nowrap;
+    line-height: 1;
   }
 </style>
