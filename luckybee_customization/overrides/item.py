@@ -1072,6 +1072,12 @@ def _sync_flipkart_item(doc):
 		# the record to fill anything in by hand.
 		if item_detail and not doc.get("custom_item_detail"):
 			doc.custom_item_detail = item_detail.name
+		# Say why the figures are old rather than leaving a stale price looking
+		# current. The previous price is deliberately kept - a failed fetch is
+		# not evidence that Flipkart stopped selling it.
+		if doc.meta.has_field("fk_data_status"):
+			doc.fk_data_status = "Refresh Failed"
+
 
 		frappe.log_error(
 			f"Flipkart returned no product data for FSN {fsn}. "
@@ -1104,6 +1110,11 @@ def _sync_flipkart_item(doc):
 		doc.fk_price = data["price"] or 0
 	if doc.meta.has_field("fk_last_synced"):
 		doc.fk_last_synced = today()
+	# Mirrors amz_data_status: a date says when we asked, the status says whether
+	# the answer can still be trusted. The daily sweep ages this into Stale.
+	if doc.meta.has_field("fk_data_status"):
+		doc.fk_data_status = "Matched"
+
 
 	# Changes.docx A5 - the rest of the Flipkart record onto the Item form.
 	# Item Details keeps its copy as the archive; these are the ones read during

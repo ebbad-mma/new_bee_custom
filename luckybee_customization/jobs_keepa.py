@@ -219,3 +219,38 @@ def bulk_keepa_sync_status():
 		"estimated_tokens_needed": syncable_remaining * 10,
 		"estimated_hours_at_refill_rate": round(syncable_remaining * 10 / 300.0, 1),
 	}
+
+
+def flag_stale_flipkart_data():
+	"""Changes.docx A5 - the Flipkart mirror of flag_stale_amazon_data.
+
+	Same reasoning: an item is Matched the moment it syncs and only becomes
+	Stale later through the passage of time, with nothing running against it, so
+	it needs its own sweep rather than being decided at sync time.
+
+	Only touches rows currently "Matched". "Refresh Failed" says something more
+	specific about why the figure cannot be trusted, and flattening that to the
+	blander "Stale" would lose it.
+
+	A single UPDATE rather than per-document saves: this is a status
+	recalculation over thousands of rows and must not re-trigger the Flipkart
+	scrape on before_save - which would also mean thousands of outbound requests.
+	"""
+	if not frappe.db.has_column("Item", "fk_data_status"):
+		return {"skipped": "fk_data_status not present"}
+
+	frappe.db.sql(
+		"""
+		UPDATE `tabItem`
+		SET fk_data_status = 'Stale'
+		WHERE fk_data_status = 'Matched'
+		  AND fk_last_synced IS NOT NULL
+		  AND fk_last_synced < DATE_SUB(CURDATE(), INTERVAL %s DAY)
+		""",
+		(STALE_AFTER_DAYS,),
+	)
+	frappe.db.commit()
+	return {
+		"marked_stale": frappe.db.count("Item", {"fk_data_status": "Stale"}),
+		"threshold_days": STALE_AFTER_DAYS,
+	}

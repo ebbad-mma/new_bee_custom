@@ -495,14 +495,26 @@ function paint_price_decision(frm, wrapper, ours) {
     const amazon = flt(frm.doc.amz_best_price) || 0;
     const flipkart = flt(frm.doc.fk_price) || 0;
 
-    const online = [amazon, flipkart].filter(v => v > 0);
+    // A5 ties freshness to the verdict: a price we last saw three months ago is
+    // not evidence about today's market. Stale figures stay on show - they are
+    // still the best we have - but they are marked and kept out of the
+    // comparison, so the block never claims we beat a price nobody has checked.
+    const amazonStale = ['Stale', 'Refresh Failed'].includes(frm.doc.amz_data_status);
+    const flipkartStale = ['Stale', 'Refresh Failed'].includes(frm.doc.fk_data_status);
+
+    const online = [
+        amazonStale ? 0 : amazon,
+        flipkartStale ? 0 : flipkart,
+    ].filter(v => v > 0);
     const toBeat = online.length ? Math.min(...online) : 0;
 
     let colour, label, detail;
     if (!toBeat) {
         colour = '#6c757d';
-        label = 'No online price';
-        detail = 'Nothing to compare against - price on MRP and margin.';
+        label = (amazon || flipkart) ? 'Online prices are stale' : 'No online price';
+        detail = (amazon || flipkart)
+            ? 'The marketplace prices we hold are too old to price against - refresh them first.'
+            : 'Nothing to compare against - price on MRP and margin.';
     } else if (!ours) {
         colour = '#6c757d';
         label = 'No selling price set';
@@ -533,8 +545,10 @@ function paint_price_decision(frm, wrapper, ours) {
         <div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
             <div style="display:flex; align-items:stretch; background:var(--fg-color);">
                 ${cell('OUR PRICE', ours ? money(ours) : '-', !ours)}
-                ${cell('AMAZON', amazon ? money(amazon) : '-', !amazon)}
-                ${cell('FLIPKART', flipkart ? money(flipkart) : '-', !flipkart)}
+                ${cell(amazonStale ? 'AMAZON (STALE)' : 'AMAZON',
+                       amazon ? money(amazon) : '-', !amazon || amazonStale)}
+                ${cell(flipkartStale ? 'FLIPKART (STALE)' : 'FLIPKART',
+                       flipkart ? money(flipkart) : '-', !flipkart || flipkartStale)}
             </div>
             <div style="background:${colour}; color:#fff; padding:6px 10px;">
                 <span style="font-weight:600;">${label}</span>
