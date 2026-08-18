@@ -17,6 +17,16 @@
     server-side, which the restricted print-format sandbox cannot do itself. -#}
 {%- set d = lb_label_data(doc.name) -%}
 {%- set has_saving = d.save_amount and d.save_amount > 0 -%}
+{#- The readable code is what staff scan the shelf for, so it is sized to fill
+    the label's full height rather than left at a fixed size. 99% of codes are
+    6-7 characters; the rare 16-18 character supplier barcodes step down so they
+    still fit rather than running off the edge. -#}
+{%- set clen = (d.code or '')|length -%}
+{%- set id_pt = 18 if clen <= 6 else (15.5 if clen == 7 else (13 if clen <= 9 else (7.5 if clen <= 12 else 5.5))) -%}
+{%- set price_txt = "{:,.0f}".format(d.our_price) -%}
+{#- Prices run to five digits. Rather than fix a size that fits the worst case
+    and waste the label on every ordinary one, it steps down only when it must. -#}
+{%- set price_pt = 26 if price_txt|length <= 3 else (23 if price_txt|length <= 5 else 19.5) -%}
 
 <div class="lb-label">
   <div class="lb-main">
@@ -28,7 +38,7 @@
       {%- if has_saving -%}
         <div class="lb-sale">SALE</div>
       {%- endif -%}
-      <div class="lb-price">&#8377;{{ "{:,.0f}".format(d.our_price) }}</div>
+      <div class="lb-price" style="font-size:{{ price_pt }}pt;">&#8377;{{ price_txt }}</div>
     </div>
 
     <div class="lb-footer">
@@ -51,7 +61,7 @@
     {%- if d.barcode_svg -%}
       <div class="lb-barcode">{{ d.barcode_svg }}</div>
     {%- endif -%}
-    <div class="lb-id">{{ d.code }}</div>
+    <div class="lb-id" style="font-size:{{ id_pt }}pt;">{{ d.code }}</div>
   </div>
 </div>
 
@@ -92,7 +102,6 @@
       margin: 1.5rem auto !important;
       height: 25mm !important;
       min-height: 25mm !important;
-      outline: 1px dashed #bbb;   /* marks the physical label edge, screen only */
     }
   }
 
@@ -164,9 +173,8 @@
   .lb-price {
     flex: 1 1 auto;
     text-align: center;
-    font-size: 21pt;
     font-weight: 800;
-    line-height: 0.92;
+    line-height: 1.02;
     letter-spacing: -0.6pt;
     white-space: nowrap;
   }
@@ -181,14 +189,14 @@
   }
 
   .lb-fig-label {
-    font-size: 5pt;
+    font-size: 7pt;
     font-weight: 700;
     letter-spacing: 0.2pt;
     line-height: 1;
   }
 
   .lb-fig-value {
-    font-size: 8.5pt;
+    font-size: 12pt;
     font-weight: 800;
     line-height: 1.05;
     white-space: nowrap;
@@ -222,11 +230,15 @@
     display: block;
   }
 
-  /* Readable ID, vertical, bold, always in the same place - this is what staff
-     read off the shelf. */
+  /* Stretched to the label's full height - this is the one thing staff read
+     off a shelf, so it gets every millimetre available. Size comes from the
+     template, computed from how many characters the code actually has. */
   .lb-id {
     writing-mode: vertical-rl;
-    font-size: 9pt;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-weight: 700;
     letter-spacing: 0.2pt;
     white-space: nowrap;
