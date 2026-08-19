@@ -273,6 +273,9 @@ doc_events = {
 		"on_update": "luckybee_customization.overrides.bin.enqueue_create_item_price"
         },
         "Sales Invoice": {
+		# Luckybee Connect part 3 - the referrer's joining bonus and their
+		# ongoing share, paid when the sale is submitted.
+		"on_submit": "luckybee_customization.api.connect_loyalty.handle_referral",
 		# 5.3 - on validate, not on_submit: the cashier should be stopped while
 		# the bill is still open and fixable, not as they take payment.
 		"validate": "luckybee_customization.api.pos_attribution.require_salesperson",
