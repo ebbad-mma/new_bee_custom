@@ -29,3 +29,4 @@ luckybee_customization.patches.pos_upi_fields
 luckybee_customization.patches.flipkart_surface_fields
 luckybee_customization.patches.flipkart_freshness
 luckybee_customization.patches.connect_loyalty_setup
+luckybee_customization.patches.connect_customer_placement
