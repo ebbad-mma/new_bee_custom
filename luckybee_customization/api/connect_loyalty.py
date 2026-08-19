@@ -12,6 +12,8 @@ This module covers what ERPNext has no concept of - social posts, reviews, and
 referrals - plus the caps that stop those being farmed.
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import add_months, add_days, flt, getdate, today
@@ -286,24 +288,70 @@ def handle_referral(doc, method=None):
 				source_type="Sales Invoice", source_name=doc.name)
 
 
+def _last10(number):
+	"""The comparable part of an Indian mobile number.
+
+	Numbers arrive typed by hand, dictated across a counter, or copied out of
+	WhatsApp - with +91, a leading zero, spaces or dashes. The last ten digits
+	are the part that identifies the person; everything else is formatting.
+	"""
+	digits = re.sub(r"\D", "", str(number or ""))
+	return digits[-10:] if len(digits) >= 10 else digits
+
+
 @frappe.whitelist()
-def generate_referral_code(customer):
-	"""A short, unique code the customer can read out or type into WhatsApp."""
-	import re
+def find_customers_by_mobile(mobile):
+	"""Customers reachable on this number, for "say the number, confirm the name".
 
-	existing = frappe.db.get_value("Customer", customer, "lb_referral_code")
-	if existing:
-		return existing
+	Returns every match rather than guessing at one. About 44 numbers in the
+	catalogue belong to more than one customer - a person and their business, or
+	two people sharing a handset - so picking the first would quietly credit the
+	wrong person's referral. The till shows the names and the cashier confirms.
+	"""
+	key = _last10(mobile)
+	if len(key) < 10:
+		return {"query": mobile, "matches": [],
+				"message": _("Enter the full ten-digit mobile number.")}
 
-	base = re.sub(r"[^A-Za-z0-9]", "", (customer or "").upper())[:6] or "LBEE"
-	for attempt in range(50):
-		suffix = frappe.utils.random_string(4).upper()
-		code = f"{base}{suffix}"[:12]
-		if not frappe.db.exists("Customer", {"lb_referral_code": code}):
-			frappe.db.set_value("Customer", customer, "lb_referral_code", code,
-								update_modified=False)
-			return code
-	frappe.throw(_("Could not generate a unique referral code."))
+	if not frappe.has_permission("Customer", "read"):
+		frappe.throw(_("Not permitted to look up customers."), frappe.PermissionError)
+
+	like = f"%{key}%"
+	names = set(frappe.db.sql_list(
+		"SELECT name FROM `tabCustomer` WHERE REPLACE(REPLACE(IFNULL(mobile_no,''), ' ', ''), '-', '') LIKE %s",
+		like))
+	# Some customers carry the number only on their linked Contact.
+	names.update(frappe.db.sql_list(
+		"""SELECT DISTINCT dl.link_name
+		   FROM `tabDynamic Link` dl
+		   JOIN `tabContact Phone` cp ON cp.parent = dl.parent
+		   WHERE dl.link_doctype = 'Customer' AND dl.parenttype = 'Contact'
+			 AND REPLACE(REPLACE(IFNULL(cp.phone,''), ' ', ''), '-', '') LIKE %s""",
+		like))
+
+	matches = []
+	for name in sorted(names):
+		row = frappe.db.get_value(
+			"Customer", name,
+			["name", "customer_name", "mobile_no", "loyalty_program_tier"], as_dict=True)
+		if not row:
+			continue
+		last = frappe.db.sql(
+			"""SELECT posting_date, grand_total FROM `tabSales Invoice`
+			   WHERE customer = %s AND docstatus = 1
+			   ORDER BY posting_date DESC LIMIT 1""", name, as_dict=True)
+		row["last_purchase"] = last[0] if last else None
+		matches.append(row)
+
+	return {
+		"query": mobile,
+		"matches": matches,
+		# Said plainly so nobody picks the first row out of habit.
+		"needs_confirmation": len(matches) > 1,
+		"message": (_("More than one customer uses this number - confirm the name.")
+					if len(matches) > 1 else
+					(_("No customer found on that number.") if not matches else "")),
+	}
 
 
 @frappe.whitelist()
@@ -330,7 +378,7 @@ def connect_summary(customer):
 		"points_balance": int(flt(details.get("loyalty_points"))),
 		"rupee_value": flt(details.get("loyalty_points")) * flt(
 			details.get("conversion_factor") or 1),
-		"referral_code": frappe.db.get_value("Customer", customer, "lb_referral_code"),
+		"mobile": frappe.db.get_value("Customer", customer, "mobile_no"),
 		"people_referred": len(referred),
 		"referrals_converted": sum(1 for r in referred if r.lb_referral_bonus_paid),
 		"social_points_this_month": social_points_this_month(customer),

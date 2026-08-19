@@ -31,3 +31,4 @@ luckybee_customization.patches.flipkart_freshness
 luckybee_customization.patches.connect_loyalty_setup
 luckybee_customization.patches.connect_customer_placement
 luckybee_customization.patches.connect_cumulative_spend
+luckybee_customization.patches.connect_drop_referral_code
