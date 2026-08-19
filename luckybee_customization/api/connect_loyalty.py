@@ -182,12 +182,39 @@ def _bill_value(doc):
 	return flt(doc.grand_total) - flt(doc.get("loyalty_amount") or 0)
 
 
+def _spend_in_window(customer, since, upto, exclude=None):
+	"""Eligible spend on submitted bills between two dates.
+
+	Read from the invoices rather than a running counter, so a cancelled or
+	amended bill cannot leave someone qualified on a total that no longer
+	exists. loyalty_amount is deducted for the same reason it is deducted from a
+	single bill: redeemed points are store credit, not new spend.
+	"""
+	conditions = ["customer = %s", "docstatus = 1", "IFNULL(is_return, 0) = 0",
+				  "posting_date >= %s", "posting_date <= %s"]
+	params = [customer, since, upto]
+	if exclude:
+		conditions.append("name != %s")
+		params.append(exclude)
+	total = frappe.db.sql(
+		f"""SELECT COALESCE(SUM(grand_total - IFNULL(loyalty_amount, 0)), 0)
+			FROM `tabSales Invoice` WHERE {' AND '.join(conditions)}""",
+		params)[0][0]
+	return flt(total)
+
+
 def handle_referral(doc, method=None):
 	"""On a submitted sale, pay whatever the referrer is owed.
 
-	Two separate things, per the plan: a one-off joining bonus once the new
-	customer's first bill clears the bar, and 1% of their spend for the twelve
-	months after that first purchase.
+	The rule, as the client settled it: track cumulative spend from the first
+	purchase; the moment it crosses the threshold - at any point inside the
+	twelve-month window - the referral qualifies, the joining bonus pays once,
+	and 1% accrues from there on, the qualifying bill included.
+
+	The window always runs twelve months from the *first purchase*, never from
+	the date of qualification. Restarting it at qualification would hand a slow
+	qualifier a longer earning run than someone who crossed the line in week
+	one, which is precisely backwards.
 	"""
 	if doc.get("is_return") or not doc.get("customer"):
 		return
@@ -201,48 +228,62 @@ def handle_referral(doc, method=None):
 
 	amount = _bill_value(doc)
 
-	# Stamp the first purchase date whether or not there is a referrer - it is
-	# the customer's own history, and it starts the referral window.
+	# Stamp the first purchase whether or not there is a referrer - it is the
+	# customer's own history, and it is what starts the window.
 	if not customer.lb_first_purchase_date and amount > 0:
 		frappe.db.set_value("Customer", doc.customer, "lb_first_purchase_date",
 							doc.posting_date, update_modified=False)
 		customer.lb_first_purchase_date = doc.posting_date
 
+	if not customer.lb_first_purchase_date:
+		return
+
+	window_ends = add_months(getdate(customer.lb_first_purchase_date),
+							 REFERRAL_ONGOING_MONTHS)
+
+	# Cumulative spend inside the window, this bill included. Recorded even
+	# without a referrer: it is the customer's own progress and is shown to them.
+	cumulative = _spend_in_window(
+		doc.customer, customer.lb_first_purchase_date, doc.posting_date,
+		exclude=doc.name) + amount
+	if frappe.get_meta("Customer").has_field("lb_referral_spend"):
+		frappe.db.set_value("Customer", doc.customer, "lb_referral_spend",
+							cumulative, update_modified=False)
+
 	referrer = customer.lb_referred_by
 	if not referrer or referrer == doc.customer:
 		return
 
-	# --- the one-off joining bonus ---------------------------------------
-	if not customer.lb_referral_bonus_paid and amount >= REFERRAL_MIN_FIRST_BILL:
+	# Nothing accrues once the twelve months are up - including qualification
+	# itself, so a customer who only reaches the threshold in month fourteen
+	# never unlocks the bonus.
+	if getdate(doc.posting_date) > window_ends:
+		return
+
+	# --- qualification, on cumulative spend -------------------------------
+	if not customer.lb_referral_bonus_paid and cumulative >= REFERRAL_MIN_FIRST_BILL:
 		award_points(
 			referrer, REFERRAL_JOINING_POINTS,
-			_("Referral bonus - {0}'s first purchase").format(doc.customer),
+			_("Referral bonus - {0} reached {1} in cumulative spend").format(
+				doc.customer, REFERRAL_MIN_FIRST_BILL),
 			source_type="Sales Invoice", source_name=doc.name)
 		frappe.db.set_value("Customer", doc.customer, "lb_referral_bonus_paid", 1,
 							update_modified=False)
+		customer.lb_referral_bonus_paid = 1
 
-	# --- the ongoing share, for 12 months from their first purchase -------
-	# Measured from the first purchase rather than from the referral being
-	# registered: the plan ties the window to when the customer started buying.
-	#
-	# Only once the referral has actually qualified. The plan gates the joining
-	# bonus behind a Rs3,000 first bill because that "filters for real,
-	# meaningful first purchases rather than token ones" - and paying the
-	# ongoing 1% on purchases made before that bar is cleared would let a
-	# referrer earn indefinitely from someone who never made a real purchase,
-	# which is the outcome the bar exists to prevent.
-	qualified = frappe.db.get_value("Customer", doc.customer, "lb_referral_bonus_paid")
-	if qualified and customer.lb_first_purchase_date:
-		window_ends = add_months(getdate(customer.lb_first_purchase_date),
-								 REFERRAL_ONGOING_MONTHS)
-		if getdate(doc.posting_date) <= window_ends:
-			share = amount * REFERRAL_ONGOING_PCT / 100.0
-			if share >= 1:
-				award_points(
-					referrer, share,
-					_("Referral share - {0}% of {1}'s purchase {2}").format(
-						REFERRAL_ONGOING_PCT, doc.customer, doc.name),
-					source_type="Sales Invoice", source_name=doc.name)
+	# --- the ongoing share ------------------------------------------------
+	# Paid on this bill too when this is the bill that qualified them: the
+	# client's wording is explicit that the qualifying spend itself counts.
+	# Earlier sub-threshold bills do not - they are not "from that point
+	# forward".
+	if customer.lb_referral_bonus_paid:
+		share = amount * REFERRAL_ONGOING_PCT / 100.0
+		if share >= 1:
+			award_points(
+				referrer, share,
+				_("Referral share - {0}% of {1}'s purchase {2}").format(
+					REFERRAL_ONGOING_PCT, doc.customer, doc.name),
+				source_type="Sales Invoice", source_name=doc.name)
 
 
 @frappe.whitelist()
