@@ -26,7 +26,9 @@ app_include_js = [
 # website_theme_scss = "luckybee_customization/public/scss/website"
 
 # include js, css files in header of web form
-# webform_include_js = {"doctype": "public/js/doctype.js"}
+# All five mobile capture forms are on Item, so one "Scan Next" control serves
+# them all rather than five copies.
+webform_include_js = {"Item": "public/js/lb_form_nav.js"}
 # webform_include_css = {"doctype": "public/css/doctype.css"}
 
 # include js in page
