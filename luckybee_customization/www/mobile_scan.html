@@ -64,45 +64,12 @@
 </div>
 
 <script src="https://unpkg.com/@zxing/browser@0.1.3/umd/zxing-browser.min.js"></script>
+<script src="/assets/luckybee_customization/js/lb_scanner.js"></script>
 <script>
 frappe.ready(function() {
-    // Our labels are alphanumeric internal codes (LX01416, LSA00007, L11873...), which are
-    // Code 128 / Code 39 - NOT the numeric-only EAN/UPC retail symbologies. The reader was
-    // previously constructed with no hints at all, so dense 1D codes frequently never
-    // resolved. Enable the 1D symbologies explicitly and turn on TRY_HARDER.
-    //
-    // Enum values below were read directly out of @zxing/browser@0.1.3's UMD bundle:
-    // BarcodeFormat is exported on the global, but DecodeHintType is NOT (minification
-    // drops the enum's name), so the two hint keys are given as their verified literals:
-    //   DecodeHintType.POSSIBLE_FORMATS = 2, DecodeHintType.TRY_HARDER = 3
-    const BF = (ZXingBrowser && ZXingBrowser.BarcodeFormat) || {
-        CODABAR: 1, CODE_39: 2, CODE_93: 3, CODE_128: 4,
-        EAN_8: 6, EAN_13: 7, ITF: 8, UPC_A: 14, UPC_E: 15
-    };
-    const HINT_POSSIBLE_FORMATS = 2;
-    const HINT_TRY_HARDER = 3;
-
-    const scanHints = new Map();
-    scanHints.set(HINT_POSSIBLE_FORMATS, [
-        BF.CODE_128,   // our LX / LSA / L-series labels
-        BF.CODE_39,    // older/alternate label printers
-        BF.CODE_93,
-        BF.CODABAR,
-        BF.ITF,
-        BF.EAN_13,     // keep retail formats for supplier barcodes
-        BF.EAN_8,
-        BF.UPC_A,
-        BF.UPC_E
-    ]);
-    scanHints.set(HINT_TRY_HARDER, true);
-
-    const codeReader = new ZXingBrowser.BrowserMultiFormatReader(scanHints, {
-        // Scan a little more often than the default; dense Code 128 needs more attempts.
-        delayBetweenScanAttempts: 100
-    });
-    let controls = null;
-    let selectedDeviceId = null;
-
+    // The detection engine lives in lb_scanner.js and is shared with the price
+    // check page. There used to be two copies of it here and there, and they had
+    // already drifted apart.
     const videoElement = document.getElementById('video-preview');
     const startBtn = document.getElementById('start-scan-btn');
     const stopBtn = document.getElementById('stop-scan-btn');
@@ -113,161 +80,11 @@ frappe.ready(function() {
     const searchAlert = document.getElementById('search-alert');
     const fileInput = document.getElementById('barcode-image-upload');
     const taskPickerCard = document.getElementById('task-picker-card');
-    const taskPickerOptions = document.getElementById('task-picker-options');
-    const taskPickerScanned = document.getElementById('task-picker-scanned');
 
-    // Carry the scanned code onto the form page so it can show what was scanned
-    // in its header strip (see public/js/mobile_common.js) - staff otherwise
-    // land on a form with no way to tell a mis-scan from the right item.
-    const withScanned = (url, term) => {
-        if (!url || !term) return url;
-        return url + (url.indexOf('?') === -1 ? '?' : '&') + 'scanned=' + encodeURIComponent(term);
-    };
-
-    const showTaskPicker = (options, term, itemCode) => {
-        taskPickerScanned.textContent = itemCode
-            ? `Scanned ${term} → ${itemCode}`
-            : '';
-        taskPickerOptions.innerHTML = '';
-        options.forEach(opt => {
-            const btn = document.createElement('a');
-            btn.href = withScanned(opt.redirect_url, term);
-            btn.className = 'btn btn-outline-primary text-start';
-            btn.innerHTML = `<strong>${opt.role}</strong><br><span class="small text-muted">${opt.task}</span>`;
-            taskPickerOptions.appendChild(btn);
-        });
-        taskPickerCard.style.display = 'block';
-    };
-
-    // Register search events immediately to be safe
-    searchBtn.addEventListener('click', () => {
-        triggerSearch(searchInput.value.trim());
-    });
-    
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') triggerSearch(searchInput.value.trim());
-    });
-
-    // Helper to robustly get camera list from ZXing
-    const getDevices = () => {
-        try {
-            if (typeof ZXingBrowser !== 'undefined') {
-                if (ZXingBrowser.BrowserCodeReader && typeof ZXingBrowser.BrowserCodeReader.listVideoInputDevices === 'function') {
-                    return ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-                }
-                if (ZXingBrowser.BrowserMultiFormatReader && typeof ZXingBrowser.BrowserMultiFormatReader.listVideoInputDevices === 'function') {
-                    return ZXingBrowser.BrowserMultiFormatReader.listVideoInputDevices();
-                }
-            }
-            if (codeReader && typeof codeReader.listVideoInputDevices === 'function') {
-                return codeReader.listVideoInputDevices();
-            }
-            if (codeReader && typeof codeReader.getVideoInputDevices === 'function') {
-                return codeReader.getVideoInputDevices();
-            }
-        } catch (e) {
-            console.error("ZXing device listing helper error:", e);
-        }
-        return Promise.reject("No compatible camera listing method found.");
-    };
-
-    // Populate cameras safely
-    getDevices()
-        .then(videoInputDevices => {
-            if (videoInputDevices && videoInputDevices.length > 0) {
-                selectedDeviceId = videoInputDevices[videoInputDevices.length - 1].deviceId;
-                videoInputDevices.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.deviceId;
-                    option.text = device.label || `Camera ${device.deviceId}`;
-                    cameraSelect.appendChild(option);
-                });
-            }
-        })
-        .catch(err => {
-            console.warn("Initial device enumeration pending permission:", err);
-        });
-
-    cameraSelect.addEventListener('change', (e) => {
-        selectedDeviceId = e.target.value;
-        if (controls) {
-            controls.stop();
-            startScanning();
-        }
-    });
-
-    const triggerSearch = (term) => {
-        if (!term) return;
-        searchBtn.disabled = true;
-        searchBtn.innerText = "Searching...";
-        searchAlert.style.display = "none";
-        taskPickerCard.style.display = "none";
-
-        frappe.call({
-            method: 'luckybee_customization.api.mobile_forms.find_item_for_mobile',
-            args: { search_term: term },
-            callback: function(r) {
-                searchBtn.disabled = false;
-                searchBtn.innerText = "Search";
-                if (r.message && r.message.status === 'found') {
-                    if (controls) controls.stop();
-                    // Redirect to Web Form
-                    window.location.href = withScanned(r.message.redirect_url, term);
-                } else if (r.message && r.message.status === 'choose') {
-                    if (controls) controls.stop();
-                    showTaskPicker(r.message.options, term, r.message.item_code);
-                } else {
-                    searchAlert.innerText = "Item not found.";
-                    searchAlert.style.display = "block";
-                }
-            },
-            error: function() {
-                searchBtn.disabled = false;
-                searchBtn.innerText = "Search";
-                searchAlert.innerText = "An error occurred during search.";
-                searchAlert.style.display = "block";
-            }
-        });
-    };
-
-    // --- detection engine ----------------------------------------------------
-    //
-    // Two things were holding the scan rate down. Our labels print the bars
-    // sideways (verified on real stock: L14550, L11893, L10306 all run
-    // vertically down the label) and 1D decoding only scans horizontal lines,
-    // so a sideways code is invisible unless the phone happens to be turned.
-    // And the pure-JS decoder was being handed whole 1080p frames, which is
-    // slow enough that most frames were simply never looked at.
-    //
-    // So: prefer the browser's native BarcodeDetector where it exists (Android
-    // Chrome). It is hardware-accelerated, reads any orientation, and is an
-    // order of magnitude faster than the JS decoder - this is what makes it
-    // feel instant. Where it does not exist, fall back to ZXing but hand it a
-    // small cropped region instead of the full frame, and try both
-    // orientations.
-    let detectTimer = null;
-    let detecting = false;
-    let nativeDetector = null;
-    let activeStream = null;
-
-    const stopDetectionLoop = () => {
-        if (detectTimer) {
-            clearInterval(detectTimer);
-            detectTimer = null;
-        }
-    };
+    let lbScanner = null;
 
     const releaseCamera = () => {
-        stopDetectionLoop();
-        if (controls) {
-            try { controls.stop(); } catch (e) {}
-            controls = null;
-        }
-        if (activeStream) {
-            activeStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
-            activeStream = null;
-        }
-        videoElement.srcObject = null;
+        if (lbScanner) lbScanner.stop();
     };
 
     const onHit = (text) => {
@@ -282,221 +99,55 @@ frappe.ready(function() {
         triggerSearch(text);
     };
 
-    const initNativeDetector = async () => {
-        if (!('BarcodeDetector' in window)) return null;
-        try {
-            const supported = await window.BarcodeDetector.getSupportedFormats();
-            const wanted = ['code_128', 'code_39', 'code_93', 'codabar', 'itf',
-                            'ean_13', 'ean_8', 'upc_a', 'upc_e'].filter(f => supported.includes(f));
-            if (!wanted.length) return null;
-            return new window.BarcodeDetector({ formats: wanted });
-        } catch (e) {
-            return null;
-        }
-    };
-
-    // Crop to the guide box and scale up. A barcode needs a couple of pixels per
-    // narrow bar to decode; cropping removes the shelf, the box art and the rest
-    // of the frame, which is both faster and far less likely to mislead the
-    // binarizer.
-    const cropCanvas = document.createElement('canvas');
-    const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
-    const rotCanvas = document.createElement('canvas');
-    const rotCtx = rotCanvas.getContext('2d', { willReadFrequently: true });
-
-    const zxingTryDecode = (canvas) => {
-        try {
-            const r = codeReader.decodeFromCanvas(canvas);
-            return r ? r.getText() : null;
-        } catch (e) {
-            return null;   // no code in this frame - expected
-        }
-    };
-
-    const zxingScanFrame = () => {
-        const vw = videoElement.videoWidth;
-        const vh = videoElement.videoHeight;
-        if (!vw) return null;
-
-        // Matches the on-screen guide box (28% / 12% offsets, 44% x 76%), with a
-        // little margin so a slightly misplaced label is still covered.
-        const sx = Math.floor(vw * 0.22);
-        const sy = Math.floor(vh * 0.06);
-        const sw = Math.floor(vw * 0.56);
-        const sh = Math.floor(vh * 0.88);
-
-        const scale = Math.min(2, Math.max(1, 900 / Math.max(sw, sh)));
-        cropCanvas.width = Math.floor(sw * scale);
-        cropCanvas.height = Math.floor(sh * scale);
-        cropCtx.drawImage(videoElement, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
-
-        const upright = zxingTryDecode(cropCanvas);
-        if (upright) return upright;
-
-        // Same crop turned 90 degrees, for our sideways-printed labels.
-        rotCanvas.width = cropCanvas.height;
-        rotCanvas.height = cropCanvas.width;
-        rotCtx.save();
-        rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
-        rotCtx.rotate(Math.PI / 2);
-        rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
-        rotCtx.restore();
-        return zxingTryDecode(rotCanvas);
-    };
-
-    const startDetectionLoop = async () => {
-        stopDetectionLoop();
-        if (nativeDetector === null) {
-            nativeDetector = await initNativeDetector();
-        }
-
-        const hint = document.getElementById('scan-hint');
-        if (hint && nativeDetector) {
-            hint.textContent = 'Fill the green box with the barcode. Any direction is fine.';
-        }
-
-        // The native path is cheap enough to run often; the JS fallback is not.
-        const interval = nativeDetector ? 100 : 200;
-
-        detectTimer = setInterval(async () => {
-            if (detecting || !videoElement.videoWidth) return;
-            detecting = true;
-            try {
-                if (nativeDetector) {
-                    const codes = await nativeDetector.detect(videoElement);
-                    if (codes && codes.length && codes[0].rawValue) {
-                        onHit(codes[0].rawValue.trim());
-                        return;
-                    }
-                } else {
-                    const text = zxingScanFrame();
-                    if (text) {
-                        onHit(text.trim());
-                        return;
-                    }
-                }
-            } catch (e) {
-                // A bad frame must never kill the loop.
-            } finally {
-                detecting = false;
-            }
-        }, interval);
-    };
-
-    // --- torch / zoom --------------------------------------------------------
-    // Stock rooms are dim and these labels sit on brown cardboard, so the torch
-    // is often the difference between a read and a miss. Zoom lets a small
-    // barcode fill more of the sensor without physically getting closer than
-    // the lens can focus.
-    const setupCameraControls = () => {
-        setTimeout(() => {
-            const stream = videoElement.srcObject;
-            if (!stream) return;
-            const track = stream.getVideoTracks && stream.getVideoTracks()[0];
-            if (!track || !track.getCapabilities) return;
-
-            let caps = {};
-            try { caps = track.getCapabilities() || {}; } catch (e) { return; }
-
-            const torchBtn = document.getElementById('torch-btn');
-            if (caps.torch && torchBtn) {
-                torchBtn.style.display = 'inline-block';
-                let on = false;
-                torchBtn.onclick = () => {
-                    on = !on;
-                    track.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
-                    torchBtn.classList.toggle('btn-warning', on);
-                    torchBtn.classList.toggle('btn-outline-secondary', !on);
-                };
-            }
-
-            const zoomWrap = document.getElementById('zoom-wrap');
-            const zoomRange = document.getElementById('zoom-range');
-            if (caps.zoom && zoomWrap && zoomRange) {
-                zoomWrap.style.display = 'flex';
-                zoomRange.min = caps.zoom.min;
-                zoomRange.max = caps.zoom.max;
-                zoomRange.step = caps.zoom.step || 0.1;
-                zoomRange.value = track.getSettings().zoom || caps.zoom.min;
-                zoomRange.oninput = () => {
-                    track.applyConstraints({ advanced: [{ zoom: Number(zoomRange.value) }] }).catch(() => {});
-                };
-            }
-        }, 700);
-    };
-
     const startScanning = async () => {
-        searchAlert.style.display = "none";
+        searchAlert.style.display = 'none';
         scannerWrapper.style.display = 'block';
         startBtn.style.display = 'none';
         stopBtn.style.display = 'block';
 
-        try {
-            const deviceIdToUse = selectedDeviceId || undefined;
+        lbScanner = new LBScanner({
+            video: videoElement,
+            onStatus: (msg) => {
+                searchAlert.innerText = msg;
+                searchAlert.style.display = msg ? 'block' : 'none';
+            },
+            onCode: (text) => {
+                scannerWrapper.style.display = 'none';
+                stopBtn.style.display = 'none';
+                startBtn.style.display = 'block';
+                onHit(text);
+            },
+        });
 
-            // Own the stream directly rather than letting ZXing open it. That is the
-            // only way to pin continuous focus and a high resolution, and both matter
-            // far more than the decoder choice for a small label read close up.
-            const videoConstraints = {
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                advanced: [
-                    { focusMode: 'continuous' },
-                    { exposureMode: 'continuous' },
-                    { whiteBalanceMode: 'continuous' }
-                ]
-            };
-            if (deviceIdToUse) {
-                videoConstraints.deviceId = { exact: deviceIdToUse };
-            } else {
-                videoConstraints.facingMode = { ideal: 'environment' };
-            }
-
-            let stream;
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
-            } catch (e) {
-                // Some devices reject the advanced block outright - retry plainly
-                // rather than leaving the user with no camera at all.
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: deviceIdToUse ? { deviceId: { exact: deviceIdToUse } }
-                                         : { facingMode: { ideal: 'environment' } },
-                    audio: false
-                });
-            }
-
-            activeStream = stream;
-            videoElement.srcObject = stream;
-            videoElement.setAttribute('playsinline', 'true');
-            await videoElement.play().catch(() => {});
-
-            setupCameraControls();
-            startDetectionLoop();
-
-            // Populate camera select dropdown once permission is granted
-            if (cameraSelect.options.length === 0) {
-                getDevices().then(devices => {
-                    if (devices && devices.length > 0) {
-                        devices.forEach(d => {
-                            const option = document.createElement('option');
-                            option.value = d.deviceId;
-                            option.text = d.label || `Camera ${d.deviceId.slice(0, 6)}`;
-                            cameraSelect.appendChild(option);
-                        });
-                        if (!selectedDeviceId) {
-                            selectedDeviceId = devices[devices.length - 1].deviceId;
-                            cameraSelect.value = selectedDeviceId;
-                        }
-                    }
-                }).catch(() => {});
-            }
-        } catch (e) {
-            console.error("Camera scanning error:", e);
-            searchAlert.innerText = "Camera error: " + (e.message || e);
-            searchAlert.style.display = "block";
+        const ok = await lbScanner.start();
+        if (!ok) {
             scannerWrapper.style.display = 'none';
             stopBtn.style.display = 'none';
             startBtn.style.display = 'block';
+            return;
+        }
+
+        // Stock rooms are dim and these labels sit on brown cardboard.
+        const torchBtn = document.getElementById('torch-btn');
+        if (torchBtn && lbScanner.hasTorch()) {
+            torchBtn.style.display = 'inline-block';
+            let on = false;
+            torchBtn.onclick = () => {
+                on = !on;
+                lbScanner.setTorch(on);
+                torchBtn.classList.toggle('btn-warning', on);
+                torchBtn.classList.toggle('btn-outline-secondary', !on);
+            };
+        }
+        const range = lbScanner.zoomRange();
+        const zoomWrap = document.getElementById('zoom-wrap');
+        const zoomRange = document.getElementById('zoom-range');
+        if (range && zoomWrap && zoomRange) {
+            zoomWrap.style.display = 'flex';
+            zoomRange.min = range.min;
+            zoomRange.max = range.max;
+            zoomRange.step = range.step || 0.1;
+            zoomRange.oninput = () => lbScanner.setZoom(Number(zoomRange.value));
         }
     };
 
@@ -532,58 +183,32 @@ frappe.ready(function() {
 
         searchAlert.style.display = "none";
         const imgUrl = URL.createObjectURL(file);
-
         try {
             const img = new Image();
             img.src = imgUrl;
             await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
 
-            if (nativeDetector === null) {
-                nativeDetector = await initNativeDetector();
-            }
-
-            if (nativeDetector) {
-                const codes = await nativeDetector.detect(img);
-                if (codes && codes.length && codes[0].rawValue) {
-                    const text = codes[0].rawValue.trim();
-                    searchInput.value = text;
-                    triggerSearch(text);
-                    return;
-                }
-            }
-
-            // ZXing, upright then rotated.
-            cropCanvas.width = img.naturalWidth;
-            cropCanvas.height = img.naturalHeight;
-            cropCtx.drawImage(img, 0, 0);
-
-            let text = zxingTryDecode(cropCanvas);
-            if (!text) {
-                rotCanvas.width = cropCanvas.height;
-                rotCanvas.height = cropCanvas.width;
-                rotCtx.save();
-                rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
-                rotCtx.rotate(Math.PI / 2);
-                rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
-                rotCtx.restore();
-                text = zxingTryDecode(rotCanvas);
-            }
-
+            // Same engine as the live path, so a sideways label reads here too.
+            const engine = lbScanner || new LBScanner({ video: videoElement });
+            const text = await engine.decodeImage(img);
             if (text) {
-                searchInput.value = text.trim();
-                triggerSearch(text.trim());
+                searchInput.value = text;
+                triggerSearch(text);
             } else {
-                searchAlert.innerText = "Could not read a barcode in that photo. Try again closer, with the bars filling more of the frame.";
+                searchAlert.innerText =
+                    "Could not read that barcode. Move closer so the bars fill more " +
+                    "of the frame, hold steady until it focuses, and avoid glare.";
                 searchAlert.style.display = "block";
             }
         } catch (err) {
             searchAlert.innerText = "Could not read that image.";
             searchAlert.style.display = "block";
-            console.error(err);
         } finally {
             URL.revokeObjectURL(imgUrl);
+            e.target.value = "";
         }
     });
+
 });
 </script>
 {% endblock %}

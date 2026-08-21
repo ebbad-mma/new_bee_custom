@@ -54,27 +54,12 @@
 </div>
 
 <script src="https://unpkg.com/@zxing/browser@0.1.3/umd/zxing-browser.min.js"></script>
+<script src="/assets/luckybee_customization/js/lb_scanner.js"></script>
 <script>
 frappe.ready(function () {
     // Staff see stock in hand as well; customers never do. This only decides
     // what the page asks for - the API refuses a guest either way.
     const IS_STAFF = {{ "true" if is_staff else "false" }};
-
-    // Same hint set as the stock-take scanner: our labels are alphanumeric
-    // Code 128, not the numeric retail symbologies, and TRY_HARDER matters on
-    // dense codes. Literals verified against @zxing/browser@0.1.3's UMD bundle -
-    // DecodeHintType is dropped by minification, so it cannot be referenced.
-    const BF = (window.ZXingBrowser && ZXingBrowser.BarcodeFormat) || {
-        CODABAR: 1, CODE_39: 2, CODE_93: 3, CODE_128: 4,
-        EAN_8: 6, EAN_13: 7, ITF: 8, UPC_A: 14, UPC_E: 15
-    };
-    const hints = new Map();
-    hints.set(2, [BF.CODE_128, BF.CODE_39, BF.CODE_93, BF.CODABAR, BF.ITF,
-                  BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E]);
-    hints.set(3, true);
-
-    const reader = new ZXingBrowser.BrowserMultiFormatReader(hints,
-        { delayBetweenScanAttempts: 100 });
 
     const video = document.getElementById('pc-video');
     const startBtn = document.getElementById('pc-start');
@@ -83,8 +68,6 @@ frappe.ready(function () {
     const input = document.getElementById('pc-input');
     const alertBox = document.getElementById('pc-alert');
     const result = document.getElementById('pc-result');
-
-    let stream = null, running = false, native = null;
 
     const say = (msg) => {
         alertBox.innerText = msg;
@@ -220,138 +203,49 @@ frappe.ready(function () {
     };
 
     // --- camera --------------------------------------------------------------
-    // Native BarcodeDetector where it exists (Android Chrome): hardware
-    // accelerated, reads any orientation, and fast enough to feel instant.
-    // Otherwise ZXing on a cropped centre strip, tried upright then rotated,
-    // because our labels print the bars sideways and a 1D decoder only reads
-    // scan lines across the bars.
-    const initNative = async () => {
-        if (!('BarcodeDetector' in window)) return null;
-        try {
-            const supported = await window.BarcodeDetector.getSupportedFormats();
-            const wanted = ['code_128', 'code_39', 'code_93', 'codabar', 'itf',
-                            'ean_13', 'ean_8', 'upc_a', 'upc_e']
-                .filter(f => supported.includes(f));
-            if (!wanted.length) return null;
-            return new window.BarcodeDetector({ formats: wanted });
-        } catch (e) { return null; }
-    };
+    // One engine, shared with the stock-take scanner (lb_scanner.js). The two
+    // pages had drifted into separate copies of the same logic.
+    const lbScanner = new LBScanner({
+        video: video,
+        onStatus: say,
+        onCode: (text) => { hideScanner(); onCode(text); },
+    });
 
-    const cropCanvas = document.createElement('canvas');
-    const rotCanvas = document.createElement('canvas');
-
-    const zxingDecode = (canvas) => {
-        try {
-            const res = reader.decodeFromCanvas(canvas);
-            return res && res.getText ? res.getText() : null;
-        } catch (e) { return null; }
-    };
-
-    const scanFrame = () => {
-        const w = video.videoWidth, h = video.videoHeight;
-        if (!w || !h) return null;
-
-        // Centre strip only - far fewer pixels than a full 1080p frame, which is
-        // what made the old full-frame decode too slow to catch anything.
-        const cw = Math.floor(w * 0.9), ch = Math.floor(h * 0.5);
-        cropCanvas.width = cw; cropCanvas.height = ch;
-        cropCanvas.getContext('2d').drawImage(
-            video, Math.floor((w - cw) / 2), Math.floor((h - ch) / 2), cw, ch, 0, 0, cw, ch);
-
-        const upright = zxingDecode(cropCanvas);
-        if (upright) return upright;
-
-        rotCanvas.width = ch; rotCanvas.height = cw;
-        const rc = rotCanvas.getContext('2d');
-        rc.save();
-        rc.translate(ch / 2, cw / 2);
-        rc.rotate(Math.PI / 2);
-        rc.drawImage(cropCanvas, -cw / 2, -ch / 2);
-        rc.restore();
-        return zxingDecode(rotCanvas);
-    };
-
-    const loop = async () => {
-        while (running) {
-            try {
-                if (native) {
-                    const found = await native.detect(video);
-                    if (found && found.length) { onCode(found[0].rawValue); return; }
-                } else {
-                    const text = scanFrame();
-                    if (text) { onCode(text); return; }
-                }
-            } catch (e) { /* keep scanning */ }
-            await new Promise(r => setTimeout(r, native ? 120 : 60));
-        }
-    };
-
-    const setupTrackControls = () => {
-        const track = stream && stream.getVideoTracks()[0];
-        if (!track || !track.getCapabilities) return;
-        let caps = {};
-        try { caps = track.getCapabilities() || {}; } catch (e) { return; }
-
-        // Stock rooms are dim and these labels sit on brown cardboard.
-        const torchBtn = document.getElementById('pc-torch');
-        if (caps.torch && torchBtn) {
-            torchBtn.style.display = 'inline-block';
-            let on = false;
-            torchBtn.onclick = () => {
-                on = !on;
-                track.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
-                torchBtn.classList.toggle('btn-warning', on);
-            };
-        }
-        const zoomWrap = document.getElementById('pc-zoom-wrap');
-        const zoom = document.getElementById('pc-zoom');
-        if (caps.zoom && zoomWrap && zoom) {
-            zoomWrap.style.display = 'flex';
-            zoom.min = caps.zoom.min; zoom.max = caps.zoom.max;
-            zoom.step = caps.zoom.step || 0.1;
-            zoom.value = (track.getSettings() || {}).zoom || caps.zoom.min;
-            zoom.oninput = () => track.applyConstraints(
-                { advanced: [{ zoom: Number(zoom.value) }] }).catch(() => {});
-        }
-        if (caps.focusMode && caps.focusMode.includes('continuous')) {
-            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
-        }
+    const hideScanner = () => {
+        lbScanner.stop();
+        scanner.style.display = 'none';
+        startBtn.style.display = 'block';
     };
 
     const start = async () => {
         say('');
-        // getUserMedia is blocked on plain http, so say so rather than
-        // appearing to do nothing.
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            say('The camera needs a secure (https) connection. Type the code instead.');
-            return;
-        }
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' },
-                         width: { ideal: 1280 }, height: { ideal: 720 } }
-            });
-        } catch (e) {
-            say('Could not open the camera. Type the code instead.');
-            return;
-        }
-        video.srcObject = stream;
-        await video.play().catch(() => {});
-        native = await initNative();
-        setupTrackControls();
         scanner.style.display = 'block';
         startBtn.style.display = 'none';
-        running = true;
-        loop();
+        if (!await lbScanner.start()) { hideScanner(); return; }
+
+        const torchBtn = document.getElementById('pc-torch');
+        if (torchBtn && lbScanner.hasTorch()) {
+            torchBtn.style.display = 'inline-block';
+            let on = false;
+            torchBtn.onclick = () => {
+                on = !on;
+                lbScanner.setTorch(on);
+                torchBtn.classList.toggle('btn-warning', on);
+            };
+        }
+        const range = lbScanner.zoomRange();
+        const zoomWrap = document.getElementById('pc-zoom-wrap');
+        const zoomInput = document.getElementById('pc-zoom');
+        if (range && zoomWrap && zoomInput) {
+            zoomWrap.style.display = 'flex';
+            zoomInput.min = range.min;
+            zoomInput.max = range.max;
+            zoomInput.step = range.step || 0.1;
+            zoomInput.oninput = () => lbScanner.setZoom(Number(zoomInput.value));
+        }
     };
 
-    const stop = () => {
-        running = false;
-        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-        video.srcObject = null;
-        scanner.style.display = 'none';
-        startBtn.style.display = 'block';
-    };
+    const stop = () => hideScanner();
 
     startBtn.onclick = start;
     stopBtn.onclick = stop;
