@@ -83,6 +83,69 @@ frappe.ready(function() {
 
     let lbScanner = null;
 
+    const taskPickerOptions = document.getElementById('task-picker-options');
+    const taskPickerScanned = document.getElementById('task-picker-scanned');
+
+    // Carry the scanned code onto the form page so it can show what was scanned
+    // in its header strip - staff otherwise land on a form with no way to tell a
+    // mis-scan from the right item.
+    const withScanned = (url, term) => {
+        if (!url || !term) return url;
+        return url + (url.indexOf('?') === -1 ? '?' : '&') + 'scanned=' + encodeURIComponent(term);
+    };
+
+    const showTaskPicker = (options, term, itemCode) => {
+        taskPickerScanned.textContent = itemCode ? `Scanned ${term} \u2192 ${itemCode}` : '';
+        taskPickerOptions.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('a');
+            btn.href = withScanned(opt.redirect_url, term);
+            btn.className = 'btn btn-outline-primary text-start';
+            btn.innerHTML = `<strong>${opt.role}</strong><br>` +
+                            `<span class="small text-muted">${opt.task}</span>`;
+            taskPickerOptions.appendChild(btn);
+        });
+        taskPickerCard.style.display = 'block';
+    };
+
+    const triggerSearch = (term) => {
+        if (!term) return;
+        searchBtn.disabled = true;
+        searchBtn.innerText = "Searching...";
+        searchAlert.style.display = "none";
+        taskPickerCard.style.display = "none";
+
+        frappe.call({
+            method: 'luckybee_customization.api.mobile_forms.find_item_for_mobile',
+            args: { search_term: term },
+            callback: function (r) {
+                searchBtn.disabled = false;
+                searchBtn.innerText = "Search";
+                if (r.message && r.message.status === 'found') {
+                    releaseCamera();
+                    window.location.href = withScanned(r.message.redirect_url, term);
+                } else if (r.message && r.message.status === 'choose') {
+                    releaseCamera();
+                    showTaskPicker(r.message.options, term, r.message.item_code);
+                } else {
+                    searchAlert.innerText = "Item not found.";
+                    searchAlert.style.display = "block";
+                }
+            },
+            error: function () {
+                searchBtn.disabled = false;
+                searchBtn.innerText = "Search";
+                searchAlert.innerText = "An error occurred during search.";
+                searchAlert.style.display = "block";
+            }
+        });
+    };
+
+    searchBtn.addEventListener('click', () => triggerSearch(searchInput.value.trim()));
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') triggerSearch(searchInput.value.trim());
+    });
+
     const releaseCamera = () => {
         if (lbScanner) lbScanner.stop();
     };
