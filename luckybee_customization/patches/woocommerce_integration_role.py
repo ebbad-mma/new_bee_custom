@@ -14,14 +14,15 @@ revisiting rather than the user being handed a broader one.
 Nothing here grants System Manager, and no Buying, Accounts or POS doctype
 appears at all.
 
-IMPORTANT, and recorded here because a role alone does not achieve it: every
-field on Item sits at permlevel 0, so Item read exposes lb_actual_cost,
-lb_margin_pct, last_purchase_rate, valuation_rate, the supplier history and both
-competitor prices. Genuinely hiding those needs field-level permissions, which
-is a separate change affecting all fourteen roles that read Item.
+A role grants access to a document, not to a field, so Item read alone would
+still have exposed lb_actual_cost, lb_margin_pct, last_purchase_rate,
+valuation_rate and the supplier history. That is handled separately, in
+item_field_security.py, which moves those eight fields to permlevel 1 and
+scopes Item Price to selling rows.
 """
 
 import frappe
+from frappe.permissions import setup_custom_perms
 
 ROLE = "WooCommerce Integration"
 
@@ -83,6 +84,13 @@ def execute():
 		if frappe.db.exists("Custom DocPerm", {"parent": doctype, "role": ROLE,
 											   "permlevel": 0}):
 			continue
+		# Custom DocPerm REPLACES the standard permissions for a doctype rather
+		# than adding to them - get_all_perms() discards every standard DocPerm
+		# whose parent appears in Custom DocPerm. So the standard rows must be
+		# copied across before the first custom row exists, or every other role
+		# silently loses the doctype. This is what frappe's own add_permission()
+		# does, and omitting it is what restore_standard_docperms had to repair.
+		setup_custom_perms(doctype)
 		perm = frappe.new_doc("Custom DocPerm")
 		perm.parent = doctype
 		perm.parenttype = "DocType"

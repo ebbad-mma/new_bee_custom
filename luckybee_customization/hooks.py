@@ -88,6 +88,15 @@ jinja = {
 	]
 }
 
+# Migration
+# ---------
+# Runs after fixtures, which is the point: sync_fixtures re-imports
+# custom_field.json on every migrate and would otherwise reset the field-level
+# permissions a patch had just set.
+after_migrate = [
+    "luckybee_customization.item_field_security.enforce_item_field_permlevels"
+]
+
 # Installation
 # ------------
 
@@ -126,13 +135,16 @@ jinja = {
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+# A buying Item Price is a supplier purchase rate, so plain Item Price read
+# hands over purchase data without going anywhere near an Item. Scoped, not
+# revoked - the connector genuinely needs selling prices.
+permission_query_conditions = {
+    "Item Price": "luckybee_customization.item_field_security.item_price_query_conditions",
+}
+
+has_permission = {
+    "Item Price": "luckybee_customization.item_field_security.item_price_has_permission",
+}
 
 # DocType Class
 # ---------------
