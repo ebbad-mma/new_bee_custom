@@ -22,6 +22,18 @@ PROTECTED = [
 	"custom_last_supplier",
 	"custom_supplier_history",
 	"supplier_items",
+	# Found by auditing the child tables rather than the field names - the Item
+	# form keeps its OWN copy of the Standard Buying rate in this grid, so
+	# blocking the Item Price doctype did nothing for it. This is what the
+	# contractor could still read.
+	"custom_item_price_details",
+	# default_supplier, buying_cost_center and every expense/income account.
+	# Nothing in the name suggests it, which is exactly why it was missed.
+	"item_defaults",
+	# Renders the purchase history panel. The API behind it is gated separately
+	# (see can_see_cost) - hiding the field stops an empty error box appearing.
+	"custom_supplier_history_html",
+	"lb_lot_ref",
 ]
 
 # Owner-Supervisor is already the senior tier elsewhere in this app - it is what
@@ -133,3 +145,25 @@ def item_price_has_permission(doc, ptype=None, user=None):
 	if not _selling_only(user):
 		return True
 	return bool(doc.get("selling"))
+
+
+def can_see_cost(user=None):
+	"""True when this user may see cost, margin and supplier data.
+
+	Reads the permission config rather than a second hard-coded role list, so
+	there is one source of truth: whoever holds permlevel-1 read on Item.
+
+	Whitelisted endpoints need this explicitly. Permlevels protect FIELDS on a
+	document; an API that queries the tables itself bypasses them entirely, which
+	is how get_supplier_history was handing over supplier names and purchase
+	invoice rates to anyone with plain Item read.
+	"""
+	from frappe.permissions import get_valid_perms
+
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	return any(
+		p.get("permlevel") == PERMLEVEL and p.get("read")
+		for p in get_valid_perms("Item", user)
+	)

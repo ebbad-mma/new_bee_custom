@@ -14,6 +14,19 @@ def get_supplier_history(item_code, limit=50):
     if not frappe.has_permission("Item", "read", doc=item_code):
         frappe.throw(frappe._("Not permitted"), frappe.PermissionError)
 
+    # Item read is NOT enough. This reads submitted Purchase Invoices directly,
+    # so it returns supplier names and purchase rates - exactly the data the
+    # cost fields are hidden for. Without this check the permlevel work is
+    # decorative: an external contractor with product access could pull the full
+    # purchase history of any item straight from this endpoint.
+    from luckybee_customization.item_field_security import can_see_cost
+
+    if not can_see_cost():
+        frappe.throw(
+            frappe._("You are not permitted to view purchase history."),
+            frappe.PermissionError,
+        )
+
     return frappe.db.sql(
         """
         SELECT
