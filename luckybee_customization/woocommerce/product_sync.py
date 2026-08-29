@@ -27,6 +27,7 @@ Three rules that are not obvious:
 """
 
 import json
+import time
 
 import frappe
 from frappe.utils import cint, flt
@@ -253,6 +254,33 @@ def _attributes(item):
 	return attributes
 
 
+# WooCommerce validates global_unique_id as a real GTIN and rejects the WHOLE
+# product if it is not one. Our fallback used custom_barcode, which for
+# Amazon-sourced items is the ASIN ("B07M7F1VPT") because the purchase-invoice
+# import copies the item code into it - so a barcode that is not a barcode was
+# taking the product down with it. Checked properly here, check digit included.
+
+GTIN_LENGTHS = (8, 12, 13, 14)
+
+
+def _valid_gtin(value):
+	digits = (value or "").strip()
+	if not digits.isdigit() or len(digits) not in GTIN_LENGTHS:
+		return False
+	body, check = digits[:-1], int(digits[-1])
+	total = 0
+	for i, ch in enumerate(reversed(body)):
+		total += int(ch) * (3 if i % 2 == 0 else 1)
+	return (10 - total % 10) % 10 == check
+
+
+def _gtin(item):
+	for candidate in (item.ean, item.custom_barcode):
+		if _valid_gtin(candidate):
+			return (candidate or "").strip()
+	return ""
+
+
 def build_payload(item, category_map, include_images=False):
 	"""The WooCommerce product body for one Item, or (None, reason) if it cannot go."""
 	if item.item_group not in VALID_CATEGORIES:
@@ -290,8 +318,8 @@ def build_payload(item, category_map, include_images=False):
 	if sale:
 		payload["sale_price"] = f"{sale:.2f}"
 
-	# Woo 9.2+ exposes GTIN/UPC/EAN/ISBN as global_unique_id.
-	gtin = (item.ean or item.custom_barcode or "").strip()
+	# Woo 9.2+ exposes GTIN/UPC/EAN/ISBN as global_unique_id, and validates it.
+	gtin = _gtin(item)
 	if gtin:
 		payload["global_unique_id"] = gtin
 
@@ -328,12 +356,14 @@ def sync_items(item_codes, include_images=False, dry_run=False):
 			continue
 
 		existing = item.get("woocommerce_product_id")
-		resp = (
-			wcapi.put(f"products/{existing}", payload)
-			if existing
-			else wcapi.post("products", payload)
-		)
-		body = resp.json()
+		resp = _send(wcapi, "put" if existing else "post",
+					 f"products/{existing}" if existing else "products", payload)
+		try:
+			body = resp.json()
+		except ValueError:
+			results["failed"].append({"item": code, "status": resp.status_code,
+									  "error": resp.text[:200]})
+			continue
 
 		if resp.status_code in (200, 201) and body.get("id"):
 			# db_set, not save() - see the module docstring on sync_keepa_item.
@@ -375,3 +405,125 @@ def sync_items(item_codes, include_images=False, dry_run=False):
 
 	frappe.db.commit()
 	return results
+
+
+# --- whole-catalogue run ------------------------------------------------------
+# 7,550 products against a store that has answered a single request in 38
+# seconds, and 504'd three times running, is a multi-hour job. It cannot be one
+# HTTP call and it must survive being interrupted, so it follows the same shape
+# as the Keepa sweep: bounded batches, resumable with no bookkeeping doctype,
+# and a clean stop rather than an exception when it runs out of time.
+
+REQUEST_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 4
+THROTTLE_SECONDS = 0.4
+DEFAULT_BATCH = 250
+MAX_RUNTIME_SECONDS = 45 * 60
+
+
+def _send(wcapi, method, path, payload):
+	"""POST/PUT with retries on 5xx. 4xx is the store's answer, not a failure to
+	deliver, so it comes straight back - a duplicate SKU must reach the caller."""
+	resp = None
+	for attempt in range(REQUEST_RETRIES):
+		resp = getattr(wcapi, method)(path, payload)
+		if resp.status_code < 500:
+			return resp
+		time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
+	return resp
+
+
+def pending_items(limit=None):
+	"""Publishable items with no WooCommerce id yet.
+
+	Resumable by construction: the id is written as each product lands, so
+	running this again simply picks up where the last run stopped. No progress
+	table to keep in step.
+	"""
+	names = frappe.db.sql(
+		"""
+		SELECT name FROM `tabItem`
+		WHERE disabled = 0
+		  AND IFNULL(woocommerce_product_id, '') = ''
+		  AND item_group IN %(groups)s
+		ORDER BY item_group, name
+		""",
+		{"groups": tuple(VALID_CATEGORIES)},
+		pluck=True,
+	)
+	return names[: int(limit)] if limit else names
+
+
+def run_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=False, max_items=None):
+	"""Publish everything still outstanding, a batch at a time."""
+	started = time.time()
+	totals = {"published": 0, "updated": 0, "skipped": 0, "failed": 0,
+			  "batches": 0, "stopped_early": None}
+	problems = []
+
+	outstanding = pending_items(max_items)
+	totals["candidates"] = len(outstanding)
+
+	for start in range(0, len(outstanding), int(batch_size)):
+		if time.time() - started > MAX_RUNTIME_SECONDS:
+			# Out of time, not out of work. The next run resumes here.
+			totals["stopped_early"] = "time limit reached"
+			break
+
+		batch = outstanding[start : start + int(batch_size)]
+		try:
+			result = sync_items(batch, include_images=include_images)
+		except Exception as e:
+			# A failure to read categories aborts the whole run by design -
+			# carrying on would file products under nothing.
+			totals["stopped_early"] = f"{type(e).__name__}: {str(e)[:150]}"
+			break
+
+		for key in ("published", "updated", "skipped", "failed"):
+			totals[key] += len(result[key])
+		problems.extend(result["failed"][:5] + result["skipped"][:5])
+		totals["batches"] += 1
+		time.sleep(THROTTLE_SECONDS)
+
+	totals["remaining"] = len(pending_items())
+	totals["minutes"] = round((time.time() - started) / 60.0, 1)
+	frappe.log_error(
+		title="WooCommerce catalogue sync finished",
+		message=frappe.as_json({"totals": totals, "sample_problems": problems[:20]}),
+	)
+	return totals
+
+
+@frappe.whitelist()
+def enqueue_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=False, max_items=None):
+	"""Start the run in the background - it is far longer than a web request."""
+	frappe.enqueue(
+		"luckybee_customization.woocommerce.product_sync.run_catalogue_sync",
+		queue="long",
+		timeout=MAX_RUNTIME_SECONDS + 600,
+		batch_size=batch_size,
+		include_images=include_images,
+		max_items=max_items,
+	)
+	return {"queued": True, "outstanding": len(pending_items()),
+			"note": "Resumable - run again to continue where it stops."}
+
+
+@frappe.whitelist()
+def catalogue_sync_status():
+	"""How much of the catalogue is published."""
+	publishable = frappe.db.sql(
+		"""SELECT COUNT(*) FROM `tabItem`
+		   WHERE disabled = 0 AND item_group IN %(groups)s""",
+		{"groups": tuple(VALID_CATEGORIES)},
+	)[0][0]
+	linked = frappe.db.sql(
+		"""SELECT COUNT(*) FROM `tabItem`
+		   WHERE disabled = 0 AND IFNULL(woocommerce_product_id, '') != ''""",
+	)[0][0]
+	return {
+		"publishable": publishable,
+		"published": linked,
+		"remaining": len(pending_items()),
+		"outside_structure": frappe.db.count("Item", {"disabled": 0}) - publishable,
+	}
