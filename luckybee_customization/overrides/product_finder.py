@@ -1,4 +1,6 @@
 import frappe
+
+from luckybee_customization.category_taxonomy import HOLDING_GROUP
 import json
 
 @frappe.whitelist()
@@ -21,7 +23,9 @@ def update_item(create_items,selected_item,item_to_be_update):
             frappe.msgprint("This ASIN item already exists. The item will be updated successfully.")
         else:
             doc = frappe.new_doc('Item')
-            doc.item_group ='All Groups'
+            # Not 'All Groups' - that is the root of the tree, and defaulting to it
+            # is how 4,617 items ended up unclassified and unpublishable.
+            doc.item_group = HOLDING_GROUP
             doc.custom_asin_no =asin_no
             doc.insert()
             item_name=(doc.title or "")[1:140]

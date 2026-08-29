@@ -1,4 +1,6 @@
 import frappe
+
+from luckybee_customization.category_taxonomy import group_for
 import json
 import time
 from frappe.utils import today
@@ -105,34 +107,18 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 				'item_tax_template': gst
 			})
 			tax_entry.insert(ignore_permissions=True)
-			if not frappe.db.exists('Item Group', group.lower()):
-				grp = frappe.new_doc('Item Group')
-				grp.item_group_name = group.lower()
-				grp.is_group = 1
-				grp.custom_type_of_group ='Item Group'
-				grp.insert()
-
-			if not frappe.db.exists('Item Group', category.lower()):
-				grp = frappe.new_doc('Item Group')
-				grp.item_group_name = category.lower()
-				grp.is_group = 1
-				grp.parent_item_group = group.lower()
-				grp.custom_type_of_group ='Category'
-				grp.insert()
-
-			if not frappe.db.exists('Item Group', sub_category.lower()):
-				grp = frappe.new_doc('Item Group')
-				grp.item_group_name = sub_category.lower()
-				grp.parent_item_group = category.lower()
-				grp.custom_type_of_group ='Sub Category'
-				grp.insert()
+			# The import used to create three Item Groups per row from the supplier's
+			# own wording, lowercased - which is how the tree reached 3,727 groups and
+			# how "Kitchen" and "kitchen" came to hold stock side by side. The category
+			# structure is fixed now, so the row is matched into it instead; anything
+			# unrecognised waits in the holding group rather than inventing a category.
 			# update multiple values
 			update_vals = {
 				'custom_mrp':safe_float_conversion(str(mrp)),
 				'gst_hsn_code':hsn,
 				'custom_luckybee_brand':new_brand,
 				'brand':new_brand,
-				'item_group':group.lower(),
+				'item_group': group_for(category, sub_category),
 				'custom_category':category.lower(),
 				'lb_sub_category':sub_category.lower(),
 				'custom_last_supplier':doc['supplier'],
@@ -146,27 +132,11 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			
 
 		if not item_code_exist:
-			if not frappe.db.exists('Item Group', group.lower()):
-				grp = frappe.new_doc('Item Group')
-				grp.item_group_name = group.lower()
-				grp.custom_type_of_group ='Item Group'
-				grp.is_group = 1
-				grp.insert()
-
-			if not frappe.db.exists('Item Group', category.lower()):
-				grp = frappe.new_doc('Item Group')
-				grp.item_group_name = category.lower()
-				grp.is_group = 1
-				grp.parent_item_group = group.lower()
-				grp.custom_type_of_group ='Category'
-				grp.insert()
-
-			if not frappe.db.exists('Item Group', sub_category.lower()):
-				grp = frappe.new_doc('Item Group')
-				grp.item_group_name = sub_category.lower()
-				grp.custom_type_of_group ='Sub Category'
-				grp.parent_item_group = category.lower()
-				grp.insert()
+			# The import used to create three Item Groups per row from the supplier's
+			# own wording, lowercased - which is how the tree reached 3,727 groups and
+			# how "Kitchen" and "kitchen" came to hold stock side by side. The category
+			# structure is fixed now, so the row is matched into it instead; anything
+			# unrecognised waits in the holding group rather than inventing a category.
 
 			item = frappe.new_doc("Item")
 			item.stock_uom = per
@@ -176,7 +146,7 @@ def search_and_insert_item(doc, description, hsn, qty, rate, per, disc1,disc2,di
 			else:
 				description=description
 			item.item_name=description
-			item.item_group = group.lower()
+			item.item_group = group_for(category, sub_category)
 			item.custom_mrp = mrp
 			item.gst_hsn_code = hsn
 			item.custom_last_supplier=doc['supplier']
