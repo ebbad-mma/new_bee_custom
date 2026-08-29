@@ -55,20 +55,47 @@ def _client():
 
 
 def fetch_category_map(wcapi):
-	"""name (lowercased) -> WooCommerce category id, for every category in the store."""
+	"""name (lowercased) -> WooCommerce category id, for every category in the store.
+
+	Raises rather than returning a partial map. The store is on shared hosting
+	that intermittently answers 504, and an empty map makes every single item
+	skip with "no WooCommerce category" - which reads like a catalogue-wide data
+	problem instead of one failed HTTP call. Better to stop and say so.
+	"""
 	import html
+	import time as _time
 
 	mapping, page = {}, 1
 	while page <= 10:
-		resp = wcapi.get("products/categories", params={"per_page": 100, "page": page})
-		if resp.status_code != 200:
-			break
-		batch = resp.json()
+		batch, last_status = None, None
+		for attempt in range(3):
+			resp = wcapi.get("products/categories", params={"per_page": 100, "page": page})
+			last_status = resp.status_code
+			if resp.status_code == 200:
+				try:
+					batch = resp.json()
+					break
+				except ValueError:
+					batch = None
+			_time.sleep(2 * (attempt + 1))
+
+		if batch is None:
+			raise frappe.ValidationError(
+				f"Could not read WooCommerce categories (page {page}, "
+				f"last status {last_status}). Aborting rather than syncing "
+				"products into the wrong categories."
+			)
 		if not batch:
 			break
 		for c in batch:
 			mapping[html.unescape(c["name"]).strip().lower()] = c["id"]
 		page += 1
+
+	if not mapping:
+		raise frappe.ValidationError(
+			"WooCommerce returned no product categories. The store must have "
+			"the agreed category structure before products can be synced."
+		)
 	return mapping
 
 
@@ -96,6 +123,136 @@ def _prices(item):
 	return (selling or mrp), None
 
 
+# --- content -----------------------------------------------------------------
+# The storefront showed the title, the short description and the description as
+# three copies of the same sentence, because 7,326 of 8,020 items have a
+# `description` that is literally their `item_name`. Repeating the title is
+# worse than saying nothing, so an item with no real content now sends no
+# description at all rather than an echo.
+
+MAX_SHORT_DESCRIPTION = 300
+
+
+def _feature_bullets(item_code):
+	"""The Amazon/Keepa feature bullets held on Item Details, if any."""
+	name = frappe.db.get_value("Item Details", {"item": item_code})
+	if not name:
+		return []
+	details = frappe.get_doc("Item Details", name)
+	return [
+		text.strip()
+		for text in (getattr(details, f"desc_feature{i}", None) for i in range(1, 7))
+		if text and text.strip()
+	]
+
+
+def _descriptions(item):
+	"""(description, short_description) - either may be empty."""
+	bullets = _feature_bullets(item.name)
+
+	own = (item.description or "").strip()
+	# Strip the wrapper Frappe's text editor adds before comparing.
+	plain = own.replace("<p>", "").replace("</p>", "").replace("<br>", " ").strip()
+	# Not just the item name: some rows carry the item CODE as their description,
+	# which is how "B000FI8ER8" was published as a product description. Anything
+	# this short is a label, not a description, whatever it happens to match.
+	echoes = {
+		(item.item_name or "").strip().lower(),
+		(item.name or "").strip().lower(),
+	}
+	own_is_title = plain.lower() in echoes or len(plain) < 20
+
+	if bullets:
+		description = "<ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>"
+		short = bullets[0]
+		if len(short) > MAX_SHORT_DESCRIPTION:
+			short = short[:MAX_SHORT_DESCRIPTION].rsplit(" ", 1)[0] + "..."
+		return description, short
+
+	if own and not own_is_title:
+		short = plain[:MAX_SHORT_DESCRIPTION].rsplit(" ", 1)[0] + ("..." if len(plain) > MAX_SHORT_DESCRIPTION else "")
+		return own, short
+
+	return "", ""
+
+
+# --- weight, size, brand, tags, attributes -----------------------------------
+# package_weight is in GRAMS and the package_* dimensions in CENTIMETRES, read
+# off real values (a shuttlecock tube at 82, a water purifier at 6380). Woo is
+# sent kilograms and centimetres, its defaults - the store's units must agree.
+
+def _shipping(item):
+	out = {}
+	grams = flt(item.package_weight)
+	if grams > 0:
+		out["weight"] = f"{grams / 1000.0:.3f}"
+	dims = {
+		"length": flt(item.package_length),
+		"width": flt(item.package_width),
+		"height": flt(item.package_height),
+	}
+	if any(v > 0 for v in dims.values()):
+		out["dimensions"] = {k: (f"{v:.1f}" if v > 0 else "") for k, v in dims.items()}
+	return out
+
+
+# amz_search_keywords is a comma-separated bag straight off Amazon and carries
+# tokens no shopper would search for - bare punctuation, and machine categories
+# like "sport_activity_glove". Cleaned rather than passed through.
+MAX_TAGS = 10
+
+
+def _tags(item):
+	seen, tags = set(), []
+	for raw in (item.amz_search_keywords or "").split(","):
+		tag = raw.strip().strip("()+-.").strip()
+		if len(tag) < 3 or "_" in tag or not any(c.isalpha() for c in tag):
+			continue
+		# Amazon's keyword bag also contains the product slug
+		# ("spaces-exotica-occasions-cotton-bathrobe"). That is a URL, not
+		# something a shopper would ever click as a tag.
+		if tag.count("-") >= 2:
+			continue
+		key = tag.lower()
+		if key in seen:
+			continue
+		seen.add(key)
+		tags.append({"name": tag})
+		if len(tags) >= MAX_TAGS:
+			break
+	return tags
+
+
+def _attributes(item):
+	"""Brand, colour, size and so on as visible product attributes.
+
+	Brand goes here rather than into Woo's own brand taxonomy, which only exists
+	from WooCommerce 9.6 and cannot be confirmed on this store - the settings
+	endpoint times out. An attribute works on every version.
+	"""
+	pairs = [
+		("Brand", item.custom_luckybee_brand or item.brand),
+		("Colour", item.color),
+		("Size", item.size),
+		("Manufacturer", item.manufacturer),
+		("Model", item.model),
+	]
+	attributes, position = [], 0
+	for label, value in pairs:
+		value = (value or "").strip()
+		if not value or value.lower() == "none":
+			continue
+		attributes.append({
+			"name": label,
+			"position": position,
+			"visible": True,
+			"variation": False,
+			"options": [value],
+		})
+		position += 1
+	return attributes
+
+
 def build_payload(item, category_map, include_images=False):
 	"""The WooCommerce product body for one Item, or (None, reason) if it cannot go."""
 	if item.item_group not in VALID_CATEGORIES:
@@ -109,18 +266,27 @@ def build_payload(item, category_map, include_images=False):
 	if not regular:
 		return None, "no price"
 
+	description, short_description = _descriptions(item)
+
 	payload = {
 		"type": "simple",
 		"status": "publish",
 		"sku": item.name,
 		"name": item.item_name or item.name,
-		"description": item.description or "",
-		"short_description": item.item_name or "",
+		"description": description,
+		"short_description": short_description,
 		"categories": [{"id": category_id}],
 		"regular_price": f"{regular:.2f}",
 		"manage_stock": True,
 		"stock_quantity": _stock(item.name),
 	}
+	payload.update(_shipping(item))
+	tags = _tags(item)
+	if tags:
+		payload["tags"] = tags
+	attributes = _attributes(item)
+	if attributes:
+		payload["attributes"] = attributes
 	if sale:
 		payload["sale_price"] = f"{sale:.2f}"
 
