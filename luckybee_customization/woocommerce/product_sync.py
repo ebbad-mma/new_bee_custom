@@ -295,15 +295,40 @@ def _gtin(item):
 # statement we can truthfully make.
 
 def _amazon_meta(item):
+	"""Inputs for the "cheaper than Amazon today" badge - never the verdict.
+
+	The badge has to be computed at render time, because a stored "we are
+	cheaper" flag becomes a false claim the moment Amazon moves. So this sends
+	the facts and lets the storefront decide.
+
+	Condition 1 of the badge spec - "genuinely the same product, matched ASIN,
+	not an approximate reference" - is enforced here rather than left to the
+	theme: without our own matched ASIN and a Matched status, nothing is sent at
+	all, so the page has no figures to build a comparison from.
+	"""
+	if not (item.get("custom_asin_no") or "").strip():
+		return []
+	if item.get("amz_data_status") != "Matched":
+		return []
 	checked = item.get("amz_last_successful_sync")
 	price = flt(item.get("amz_best_price"))
 	if not checked or price <= 0:
 		return []
-	return [
+
+	meta = [
 		{"key": "lb_amz_price", "value": f"{price:.2f}"},
 		{"key": "lb_amz_price_checked_on", "value": str(checked)},
-		{"key": "lb_amz_data_status", "value": item.get("amz_data_status") or ""},
+		{"key": "lb_amz_match", "value": "exact"},
 	]
+	# Flipkart, for the optional "cheaper than online today" variant - same three
+	# conditions, against whichever competitor price is lower.
+	fk = flt(item.get("fk_price"))
+	if fk > 0 and item.get("fk_data_status") == "Matched" and item.get("fk_last_synced"):
+		meta += [
+			{"key": "lb_fk_price", "value": f"{fk:.2f}"},
+			{"key": "lb_fk_price_checked_on", "value": str(item.get("fk_last_synced"))},
+		]
+	return meta
 
 
 def build_payload(item, category_map, include_images=True, require_image=True):
@@ -331,7 +356,11 @@ def build_payload(item, category_map, include_images=True, require_image=True):
 		"type": "simple",
 		"status": "publish",
 		"sku": item.name,
-		"name": item.item_name or item.name,
+		# item_name is the purchase-invoice line - an internal record, not fit to
+		# publish. The Website Title replaces it as soon as one exists. Amazon's
+		# own title is never used here: reusing their sentence is duplicate
+		# content and their copyright, which is why it lives in search terms only.
+		"name": (item.get("lb_website_title") or "").strip() or item.item_name or item.name,
 		"description": description,
 		"short_description": short_description,
 		"categories": [{"id": category_id}],
@@ -347,6 +376,10 @@ def build_payload(item, category_map, include_images=True, require_image=True):
 	if attributes:
 		payload["attributes"] = attributes
 	meta = _amazon_meta(item)
+	terms = (item.get("lb_search_terms") or "").strip()
+	if terms:
+		# Indexed for search, never displayed - see section 1.5 of the spec.
+		meta.append({"key": "lb_search_terms", "value": terms[:2000]})
 	if meta:
 		payload["meta_data"] = meta
 	if sale:
@@ -391,6 +424,14 @@ def sync_items(item_codes, include_images=True, dry_run=False, require_image=Tru
 			continue
 
 		existing = item.get("woocommerce_product_id")
+		if not existing:
+			# The slug is the web address and is PERMANENT once published:
+			# changing it breaks every existing link and loses the ranking. So it
+			# is sent on creation only and never on an update, however the title
+			# is later edited.
+			slug = (item.get("lb_url_slug") or "").strip()
+			if slug:
+				payload["slug"] = slug
 		resp = _send(wcapi, "put" if existing else "post",
 					 f"products/{existing}" if existing else "products", payload)
 		try:
