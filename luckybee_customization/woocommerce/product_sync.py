@@ -294,6 +294,18 @@ def _gtin(item):
 # day stored anywhere in the catalogue, so "checked 31 Aug" is the most precise
 # statement we can truthfully make.
 
+# Ashish set the storefront comparison window at 30 days (2026-08-31). This is
+# deliberately NOT the same as flag_stale_amazon_data's 90-day sweep: that marks
+# data we distrust generally, while this is the narrower question of whether a
+# figure is current enough to make a public price claim against.
+#
+# Enforced here as well as in the theme, on purpose. The sync is periodic, so a
+# product synced today and not touched again would sit in WooCommerce with a
+# months-old figure attached - the theme must check the date too. Dropping the
+# meta at source means a stale comparison cannot be rendered even if it does not.
+PRICE_COMPARISON_MAX_AGE_DAYS = 30
+
+
 def _amazon_meta(item):
 	"""Inputs for the "cheaper than Amazon today" badge - never the verdict.
 
@@ -313,6 +325,11 @@ def _amazon_meta(item):
 	checked = item.get("amz_last_successful_sync")
 	price = flt(item.get("amz_best_price"))
 	if not checked or price <= 0:
+		return []
+
+	from frappe.utils import date_diff, nowdate
+
+	if date_diff(nowdate(), checked) > PRICE_COMPARISON_MAX_AGE_DAYS:
 		return []
 
 	meta = [
