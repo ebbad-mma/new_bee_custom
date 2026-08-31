@@ -51,10 +51,49 @@ PRIVILEGED_ROLES = [
 
 PERMLEVEL = 1
 
+# Approval sits at its own level, deliberately not level 1. Udit drafts product
+# names and Ashish approves them; whoever approves copy has no business seeing
+# margins as a side effect, and the buyer who sees cost should not thereby gain
+# approval rights. Sharing a level would silently couple the two.
+APPROVAL_FIELDS = ["pb_publish_status"]
+APPROVAL_PERMLEVEL = 2
+
+
+def _set_field_permlevel(fieldname, level):
+	"""Returns True if it had to be changed."""
+	custom = frappe.db.get_value("Custom Field",
+								 {"dt": "Item", "fieldname": fieldname}, "name")
+	if custom:
+		if frappe.db.get_value("Custom Field", custom, "permlevel") != level:
+			frappe.db.set_value("Custom Field", custom, "permlevel", level,
+								update_modified=False)
+			return True
+		return False
+
+	if not frappe.get_meta("Item").has_field(fieldname):
+		return False
+
+	existing = frappe.db.get_value("Property Setter",
+		{"doc_type": "Item", "field_name": fieldname, "property": "permlevel"}, "value")
+	if str(existing) != str(level):
+		frappe.make_property_setter({
+			"doctype": "Item", "fieldname": fieldname, "property": "permlevel",
+			"value": level, "property_type": "Int",
+		}, is_system_generated=False)
+		return True
+	return False
+
 
 def enforce_item_field_permlevels():
 	"""Idempotent; safe to run on every migrate."""
 	changed = []
+
+	# The approval field, same reasoning as the cost fields: fixtures re-import
+	# custom_field.json after patches, so a permlevel set only in a patch is
+	# reset on the next migrate.
+	for fieldname in APPROVAL_FIELDS:
+		if _set_field_permlevel(fieldname, APPROVAL_PERMLEVEL):
+			changed.append(f"{fieldname}->L{APPROVAL_PERMLEVEL}")
 
 	for fieldname in PROTECTED:
 		custom = frappe.db.get_value("Custom Field",
