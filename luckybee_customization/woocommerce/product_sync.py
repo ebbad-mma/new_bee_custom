@@ -281,7 +281,7 @@ def _gtin(item):
 	return ""
 
 
-def build_payload(item, category_map, include_images=False):
+def build_payload(item, category_map, include_images=True, require_image=True):
 	"""The WooCommerce product body for one Item, or (None, reason) if it cannot go."""
 	if item.item_group not in VALID_CATEGORIES:
 		return None, f"item_group '{item.item_group}' is not in the agreed structure"
@@ -293,6 +293,12 @@ def build_payload(item, category_map, include_images=False):
 	regular, sale = _prices(item)
 	if not regular:
 		return None, "no price"
+
+	# Ashish's rule: a product with no photograph does not go on the storefront.
+	# This is a skip, not a failure - the item is fine, it just has nothing to
+	# show, and it will publish itself on a later run once a photo is added.
+	if require_image and not (item.image or "").strip():
+		return None, "no photo"
 
 	description, short_description = _descriptions(item)
 
@@ -323,9 +329,9 @@ def build_payload(item, category_map, include_images=False):
 	if gtin:
 		payload["global_unique_id"] = gtin
 
-	# Off by default: every image we hold is hotlinked from Amazon or Flipkart,
-	# and Woo downloads on import - which would put marketplace photography on
-	# the storefront as a stored copy. Ashish's call, not a default.
+	# Every image we hold is hotlinked from Amazon or Flipkart and Woo downloads
+	# on import, so this stores a copy of marketplace photography. Ashish decided
+	# to publish them as they are for now and replace them later.
 	if include_images and item.image:
 		payload["images"] = [{"src": item.image}]
 
@@ -333,12 +339,13 @@ def build_payload(item, category_map, include_images=False):
 
 
 @frappe.whitelist()
-def sync_items(item_codes, include_images=False, dry_run=False):
+def sync_items(item_codes, include_images=True, dry_run=False, require_image=True):
 	"""Publish or update the given items. Returns a per-item result."""
 	if isinstance(item_codes, str):
 		item_codes = json.loads(item_codes)
 	include_images = cint(include_images) == 1 if not isinstance(include_images, bool) else include_images
 	dry_run = cint(dry_run) == 1 if not isinstance(dry_run, bool) else dry_run
+	require_image = cint(require_image) == 1 if not isinstance(require_image, bool) else require_image
 
 	wcapi = _client()
 	category_map = fetch_category_map(wcapi)
@@ -346,7 +353,7 @@ def sync_items(item_codes, include_images=False, dry_run=False):
 
 	for code in item_codes:
 		item = frappe.get_doc("Item", code)
-		payload, reason = build_payload(item, category_map, include_images)
+		payload, reason = build_payload(item, category_map, include_images, require_image)
 		if not payload:
 			results["skipped"].append({"item": code, "reason": reason})
 			continue
@@ -445,6 +452,7 @@ def pending_items(limit=None):
 		SELECT name FROM `tabItem`
 		WHERE disabled = 0
 		  AND IFNULL(woocommerce_product_id, '') = ''
+		  AND IFNULL(image, '') != ''
 		  AND item_group IN %(groups)s
 		ORDER BY item_group, name
 		""",
@@ -454,7 +462,7 @@ def pending_items(limit=None):
 	return names[: int(limit)] if limit else names
 
 
-def run_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=False, max_items=None):
+def run_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=True, max_items=None):
 	"""Publish everything still outstanding, a batch at a time."""
 	started = time.time()
 	totals = {"published": 0, "updated": 0, "skipped": 0, "failed": 0,
@@ -495,7 +503,7 @@ def run_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=False, max_items
 
 
 @frappe.whitelist()
-def enqueue_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=False, max_items=None):
+def enqueue_catalogue_sync(batch_size=DEFAULT_BATCH, include_images=True, max_items=None):
 	"""Start the run in the background - it is far longer than a web request."""
 	frappe.enqueue(
 		"luckybee_customization.woocommerce.product_sync.run_catalogue_sync",
@@ -514,7 +522,14 @@ def catalogue_sync_status():
 	"""How much of the catalogue is published."""
 	publishable = frappe.db.sql(
 		"""SELECT COUNT(*) FROM `tabItem`
-		   WHERE disabled = 0 AND item_group IN %(groups)s""",
+		   WHERE disabled = 0 AND IFNULL(image, '') != ''
+			 AND item_group IN %(groups)s""",
+		{"groups": tuple(VALID_CATEGORIES)},
+	)[0][0]
+	no_photo = frappe.db.sql(
+		"""SELECT COUNT(*) FROM `tabItem`
+		   WHERE disabled = 0 AND IFNULL(image, '') = ''
+			 AND item_group IN %(groups)s""",
 		{"groups": tuple(VALID_CATEGORIES)},
 	)[0][0]
 	linked = frappe.db.sql(
@@ -525,5 +540,7 @@ def catalogue_sync_status():
 		"publishable": publishable,
 		"published": linked,
 		"remaining": len(pending_items()),
-		"outside_structure": frappe.db.count("Item", {"disabled": 0}) - publishable,
+		"held_back_no_photo": no_photo,
+		"outside_structure": frappe.db.count("Item", {"disabled": 0})
+		- publishable - no_photo,
 	}
