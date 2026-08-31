@@ -232,6 +232,9 @@ def _attributes(item):
 	endpoint times out. An attribute works on every version.
 	"""
 	pairs = [
+		# First, so the condition badge and the "Fresh only" filter have a
+		# predictable attribute to read.
+		("Condition", item.get("lb_condition")),
 		("Brand", item.custom_luckybee_brand or item.brand),
 		("Colour", item.color),
 		("Size", item.size),
@@ -281,6 +284,28 @@ def _gtin(item):
 	return ""
 
 
+# --- Amazon price comparison --------------------------------------------------
+# The storefront shows "Amazon price today - checked <date>" and hides the
+# comparison once the figure goes stale. Both halves have to travel: a date with
+# no price says nothing, and a price with no date invites treating a months-old
+# figure as today's.
+#
+# NOTE: amz_last_successful_sync is a Date, not a Datetime - there is no time of
+# day stored anywhere in the catalogue, so "checked 31 Aug" is the most precise
+# statement we can truthfully make.
+
+def _amazon_meta(item):
+	checked = item.get("amz_last_successful_sync")
+	price = flt(item.get("amz_best_price"))
+	if not checked or price <= 0:
+		return []
+	return [
+		{"key": "lb_amz_price", "value": f"{price:.2f}"},
+		{"key": "lb_amz_price_checked_on", "value": str(checked)},
+		{"key": "lb_amz_data_status", "value": item.get("amz_data_status") or ""},
+	]
+
+
 def build_payload(item, category_map, include_images=True, require_image=True):
 	"""The WooCommerce product body for one Item, or (None, reason) if it cannot go."""
 	if item.item_group not in VALID_CATEGORIES:
@@ -321,6 +346,9 @@ def build_payload(item, category_map, include_images=True, require_image=True):
 	attributes = _attributes(item)
 	if attributes:
 		payload["attributes"] = attributes
+	meta = _amazon_meta(item)
+	if meta:
+		payload["meta_data"] = meta
 	if sale:
 		payload["sale_price"] = f"{sale:.2f}"
 
